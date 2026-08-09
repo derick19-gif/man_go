@@ -1,0 +1,125 @@
+:root {
+    --bg-dark: #0d131d;
+    --bg-card-dark: #161f2e;
+    --accent-green: #00c853;
+    --accent-hover: #00e676;
+    --text-primary: #1e293b;
+    --text-muted: #64748b;
+    --text-light: #f8fafc;
+    --border-color: #e2e8f0;
+    --border-dark: #2a3749;
+    --radius: 8px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+    --shadow-lg: 0 10px 25px rgba(0,0,0,0.15);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    background-color: #f8fafc;
+    color: var(--text-primary);
+    line-height: 1.6;
+}
+
+/* Sections sombres d'impact */
+.bg-dark-section {
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+    padding: 80px 20px;
+}
+
+.container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+/* Boutons */
+.btn-mango {
+    display: inline-block;
+    background-color: var(--accent-green);
+    color: #fff;
+    padding: 12px 28px;
+    border-radius: var(--radius);
+    text-decoration: none;
+    font-weight: 600;
+    transition: background 0.2s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-mango:hover {
+    background-color: var(--accent-hover);
+}
+
+.btn-outline {
+    border: 2px solid #fff;
+    color: #fff;
+    background: transparent;
+    padding: 10px 24px;
+    border-radius: var(--radius);
+    text-decoration: none;
+    font-weight: 600;
+}
+
+/* Grilles */
+.grid-4 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 24px;
+}
+
+.grid-3 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 30px;
+}
+
+/* Cartes Produits */
+.product-card {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.product-image {
+    width: 100%;
+    height: 240px;
+    object-fit: cover;
+    background-color: #e2e8f0;
+}
+
+.product-body {
+    padding: 16px;
+}
+
+.badge-gros {
+    background: #e11d48;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+/* Module Conteneurs & Logistique */
+.container-card {
+    background: var(--bg-card-dark);
+    border: 1px solid var(--border-dark);
+    padding: 24px;
+    border-radius: var(--radius);
+    color: var(--text-light);
+}
