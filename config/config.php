@@ -13,6 +13,7 @@ define('DB_PASS', '');
 // Route et URL de base
 define('BASE_URL_PATH', '/man_go');
 define('BASE_URL', 'http://localhost/man_go');
+define('APP_URL', 'http://localhost/man_go');
 define('APP_NAME', 'MAN GO Marketplace');
 define('APP_VERSION', '1.0.0');
 define('DEFAULT_LANG', 'fr');

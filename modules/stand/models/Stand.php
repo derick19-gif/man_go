@@ -1,5 +1,5 @@
 <?php
-// modules/stands/models/Stand.php
+// modules/stand/models/Stand.php
 
 // Chargement sécurisé de core/Model.php
 if (!class_exists('Model')) {
@@ -42,7 +42,7 @@ class Stand extends Model {
         $sql = "
             SELECT s.*, COUNT(a.id) AS total_annonces 
             FROM {$this->table} s
-            LEFT JOIN ads a ON a.shop_id = s.id AND a.status = 'active'
+            LEFT JOIN ads a ON a.stand_id = s.id AND a.status = 'active'
             WHERE {$whereSql}
             GROUP BY s.id
             ORDER BY s.created_at DESC

@@ -175,39 +175,39 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
 
                 <ul class="nav nav-pills flex-column mb-auto gap-1">
                     <li class="nav-item">
-                        <a href="dashboard.php" class="nav-link active">
+                        <a href="<?= BASE_URL ?>/" class="nav-link active">
                             <i class="bi bi-speedometer2 me-2"></i> Vue d'ensemble
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="my-listings.php" class="nav-link text-dark">
+                        <a href="<?= BASE_URL ?>/listings" class="nav-link text-dark">
                             <i class="bi bi-card-list me-2"></i> Mes annonces
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="my-shop.php" class="nav-link text-dark">
+                        <a href="<?= BASE_URL ?>/stands" class="nav-link text-dark">
                             <i class="bi bi-shop me-2"></i> Ma boutique
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="messages.php" class="nav-link text-dark">
-                            <i class="bi bi-chat-dots me-2"></i> Messages
+                        <a href="<?= BASE_URL ?>/services" class="nav-link text-dark">
+                            <i class="bi bi-chat-dots me-2"></i> Services
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="favorites.php" class="nav-link text-dark">
+                        <a href="<?= BASE_URL ?>/favorites" class="nav-link text-dark">
                             <i class="bi bi-heart me-2"></i> Favoris
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="profile-settings.php" class="nav-link text-dark">
+                        <a href="<?= BASE_URL ?>/profile-settings" class="nav-link text-dark">
                             <i class="bi bi-gear me-2"></i> Paramètres
                         </a>
                     </li>
                 </ul>
                 <hr class="my-3">
                 <div>
-                    <a href="logout.php" class="nav-link text-danger fw-semibold">
+                    <a href="<?= BASE_URL ?>/logout" class="nav-link text-danger fw-semibold">
                         <i class="bi bi-box-arrow-right me-2"></i> Déconnexion
                     </a>
                 </div>

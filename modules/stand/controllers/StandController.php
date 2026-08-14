@@ -30,7 +30,7 @@ if (file_exists($standModelPath)) {
 
 class StandController extends Controller {
 
-    public function index() {
+        public function index() {
         $standModel = new Stand();
 
         $search   = trim(filter_input(INPUT_GET, 'search', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
@@ -46,35 +46,15 @@ class StandController extends Controller {
         $stands      = $standModel->getActiveStands($search, $location, $category, $limit, $offset);
         $categories  = $standModel->getCategories();
 
-        $viewPath = __DIR__ . '/../views/index.php';
-
-        if (file_exists($viewPath)) {
-            if (method_exists($this, 'render')) {
-                $this->render('stands/views/index', [
-                    'stands'      => $stands,
-                    'totalStands' => $totalStands,
-                    'totalPages'  => $totalPages,
-                    'page'        => $page,
-                    'search'      => $search,
-                    'location'    => $location,
-                    'category'    => $category,
-                    'categories'  => $categories
-                ]);
-            } else {
-                extract([
-                    'stands'      => $stands,
-                    'totalStands' => $totalStands,
-                    'totalPages'  => $totalPages,
-                    'page'        => $page,
-                    'search'      => $search,
-                    'location'    => $location,
-                    'category'    => $category,
-                    'categories'  => $categories
-                ]);
-                require_once $viewPath;
-            }
-        } else {
-            echo "Aperçu des boutiques indisponible (Vue introuvable).";
-        }
+        echo $this->render('index', [
+            'stands'      => $stands,
+            'totalStands' => $totalStands,
+            'totalPages'  => $totalPages,
+            'page'        => $page,
+            'search'      => $search,
+            'location'    => $location,
+            'category'    => $category,
+            'categories'  => $categories
+        ]);
     }
 }

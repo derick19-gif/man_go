@@ -1,5 +1,9 @@
 <?php
 
+require_once __DIR__ . '/../../../core/Session.php';
+require_once __DIR__ . '/../../../classes/Security.php';
+require_once __DIR__ . '/../../../core/Countries.php';
+
 use App\Models\User;
 
 /**
@@ -9,7 +13,12 @@ use App\Models\User;
  */
 class AuthController extends Controller
 {
-    /**
+        public function __construct(Request $request)
+    {
+        parent::__construct($request);
+    }
+
+        /**
      * Show login form
      * 
      * @return void
@@ -31,6 +40,60 @@ class AuthController extends Controller
             'error'      => $error,
             'expired'    => $expired,
         ]);
+    }
+
+    /**
+     * Show register form
+     * 
+     * @return void
+     */
+        public function registerAction(): void
+    {
+        if (Session::isAuthenticated()) {
+            $this->redirect(APP_URL . '/dashboard');
+        }
+
+        echo $this->render('register', [
+            'csrf_token'      => Security::generateCsrfToken(),
+            'country_options' => Countries::renderSelectOptions('+228'),
+        ]);
+    }
+
+    /**
+     * Process registration
+     * 
+     * @return void
+     */
+    public function registerProcessAction(): void
+    {
+        if (!$this->request->isPost()) {
+            $this->redirect(APP_URL . '/register');
+        }
+
+        // Verify CSRF token
+        $token = $this->request->post('_token');
+        if (!Security::verifyCsrfToken($token)) {
+            Session::flash('error', 'Token invalide.');
+            $this->redirect(APP_URL . '/register');
+        }
+
+        $name = trim($this->request->post('name', ''));
+        $email = trim($this->request->post('email', ''));
+        $phone = trim($this->request->post('phone', ''));
+        $countryCode = $this->request->post('country_code', '+228');
+        $password = $this->request->post('password', '');
+
+        if (empty($name) || empty($email) || empty($password)) {
+            Session::flash('error', 'Veuillez remplir tous les champs obligatoires.');
+            $this->redirect(APP_URL . '/register');
+        }
+
+        // TODO: Implémenter la logique d'enregistrement utilisateur ici
+        // $userModel = new User();
+        // $userModel->create(...);
+
+        Session::flash('message', 'Compte créé avec succès. Vous pouvez vous connecter.');
+        $this->redirect(APP_URL . '/login');
     }
 
     /**

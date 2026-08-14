@@ -8,7 +8,7 @@ class Model {
     public function __construct() {
         // Tentative de récupération de l'instance de base de données
         if (class_exists('Database')) {
-            $this->db = Database::getInstance()->getConnection();
+            $this->db = Database::getInstance();
         } else {
             // Chargement de secours si Database.php n'est pas encore inclus
             $dbPath = __DIR__ . '/Database.php';
@@ -19,7 +19,7 @@ class Model {
             if (file_exists($dbPath)) {
                 require_once $dbPath;
                 if (class_exists('Database')) {
-                    $this->db = Database::getInstance()->getConnection();
+                    $this->db = Database::getInstance();
                 }
             }
         }

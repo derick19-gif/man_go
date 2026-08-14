@@ -97,7 +97,7 @@ $whatsapp_url = !empty($clean_phone) ? "https://wa.me/" . $clean_phone . "?text=
             <nav class="hidden md:flex space-x-8 text-sm font-medium">
                 <a href="index.php" class="hover:text-amber-500 transition">Accueil</a>
                 <a href="listings.php" class="text-amber-500 hover:text-amber-400">Annonces</a>
-                <a href="shops.php" class="hover:text-amber-500 transition">Boutiques & Stands</a>
+                <a href="stands" class="hover:text-amber-500 transition">Boutiques & Stands</a>
                 <a href="services.php" class="hover:text-amber-500 transition">Services</a>
             </nav>
 

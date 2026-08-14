@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <!-- Nav Simplifiée -->
     <header class="bg-slate-900 text-white py-4 shadow">
         <div class="max-w-7xl mx-auto px-4 flex justify-between items-center">
-            <a href="index.php" class="flex items-center space-x-2">
+            <a href="/man_go/" class="flex items-center space-x-2">
                 <span class="bg-amber-500 text-slate-900 font-black text-xl w-8 h-8 rounded-full flex items-center justify-center">M</span>
                 <span class="font-extrabold text-xl tracking-wide">MAN <span class="text-amber-500">GO</span></span>
             </a>

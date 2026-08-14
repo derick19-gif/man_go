@@ -39,16 +39,16 @@ class Controller
      * @param array $data
      * @return string
      */
-    protected function render(string $view, array $data = []): string
-    {
-        extract($data);
+        protected function render(string $view, array $data = []): string
+        {
+            extract($data);
 
-        ob_start();
-        include APP_PATH . '/modules/' . strtolower(basename(get_class($this), 'Controller')) . '/views/' . $view . '.php';
-        $content = ob_get_clean();
+            ob_start();
+            include APP_PATH . '/modules/' . strtolower(basename(get_class($this), 'Controller')) . '/views/' . $view . '.php';
+            $content = ob_get_clean();
 
-        return $content;
-    }
+            return $content;
+        }
 
     /**
      * Send JSON response

@@ -74,55 +74,60 @@ class Router
         return $this;
     }
 
-    /**
-     * Résout la route correspondant à la requête courante
-     */
-    public function resolve(): void
-    {
-        $method = strtoupper($this->request->getMethod());
+        /**
+         * Résout la route correspondant à la requête courante
+         */
+        public function resolve(): void
+        {
+            $method = strtoupper($this->request->getMethod());
         
-        // Support du Method Spoofing pour les formulaires (ex: POST avec _method=DELETE ou _method=PUT)
-        if ($method === 'POST' && isset($_POST['_method'])) {
-            $overrideMethod = strtoupper(trim((string)$_POST['_method']));
-            if (in_array($overrideMethod, ['PUT', 'PATCH', 'DELETE', 'HEAD'], true)) {
-                $method = $overrideMethod;
+            // Support du Method Spoofing pour les formulaires (ex: POST avec _method=DELETE ou _method=PUT)
+            if ($method === 'POST' && isset($_POST['_method'])) {
+                $overrideMethod = strtoupper(trim((string)$_POST['_method']));
+                if (in_array($overrideMethod, ['PUT', 'PATCH', 'DELETE', 'HEAD'], true)) {
+                    $method = $overrideMethod;
+                }
             }
+
+            $path = $this->normalizePath($this->request->getPath());
+            $routesForMethod = $this->routes[$method] ?? [];
+
+            foreach ($routesForMethod as $route) {
+                if (preg_match($route['pattern'], $path, $matches)) {
+                    // Extraction des paramètres nommés {slug}, {id}, etc.
+                    $params = array_filter(
+                        $matches,
+                        fn($key): bool => !is_int($key),
+                        ARRAY_FILTER_USE_KEY
+                    );
+
+                    $this->dispatchHandler($route['callback'], $params);
+                    exit; // Arrêt immédiat de l'exécution
+                }
+            }
+
+            $this->handleNotFound();
         }
 
-        $path = $this->normalizePath($this->request->getPath());
-        $routesForMethod = $this->routes[$method] ?? [];
-
-        foreach ($routesForMethod as $route) {
-            if (preg_match($route['pattern'], $path, $matches)) {
-                // Extraction des paramètres nommés {slug}, {id}, etc.
-                $params = array_filter(
-                    $matches,
-                    fn($key): bool => !is_int($key),
-                    ARRAY_FILTER_USE_KEY
-                );
-
-                $this->dispatchHandler($route['callback'], $params);
-                return;
-            }
-        }
-
-        $this->handleNotFound();
-    }
-
-    /**
+        /**
      * Normalise l'URL courante en retirant les query params et le prefix BASE_URL_PATH
      */
     private function normalizePath(string $path): string
     {
-        $path = explode('?', $path)[0];
+        // Nettoyer les query params
+        $path = parse_url($path, PHP_URL_PATH) ?? '/';
+        
         $basePath = defined('BASE_URL_PATH') ? BASE_URL_PATH : '/man_go';
         
-        if (!empty($basePath) && str_starts_with($path, $basePath)) {
+        // Si le chemin commence par le base path, on le retire
+        if (!empty($basePath) && stripos($path, $basePath) === 0) {
             $path = substr($path, strlen($basePath));
         }
 
+        // Assurer que le chemin commence par /
         $path = '/' . trim($path, '/');
-        return $path === '' ? '/' : $path;
+        
+        return ($path === '') ? '/' : $path;
     }
 
     /**
@@ -172,7 +177,8 @@ class Router
             $possiblePaths = [
                 $baseAppPath . '/modules/' . $pluralModule . '/controllers/' . $className . '.php',
                 $baseAppPath . '/modules/' . $singularModule . '/controllers/' . $className . '.php',
-                $baseAppPath . '/controllers/' . $className . '.php'
+                $baseAppPath . '/controllers/' . $className . '.php',
+                $baseAppPath . '/app/controllers/' . $className . '.php'
             ];
 
             foreach ($possiblePaths as $file) {
