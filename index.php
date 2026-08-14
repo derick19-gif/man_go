@@ -34,6 +34,8 @@ $router->get('/', 'HomeController@index');
 
 // Routes principales (Correction des correspondances)
 $router->get('/listings', 'ListingController@index');
+$router->get('/publish', 'ListingController@create');
+$router->post('/publish', 'ListingController@store');
 $router->get('/stands', 'StandController@index');
 $router->get('/services', 'ServiceController@index'); 
 

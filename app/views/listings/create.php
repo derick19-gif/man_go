@@ -213,7 +213,7 @@ if (file_exists(__DIR__ . '/includes/header.php')) {
         </div>
     <?php endif; ?>
 
-    <form action="publish.php" method="POST" enctype="multipart/form-data" class="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-sm space-y-6">
+    <form action="<?= BASE_URL ?>/publish" method="POST" enctype="multipart/form-data" class="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 shadow-sm space-y-6">
         
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token']) ?>">
 
