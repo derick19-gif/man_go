@@ -7,10 +7,10 @@
     height: "85dp"
     radius: [15, 15, 15, 15]
     elevation: 1
-    # Bleu WhatsApp très léger pour les non-lus, Blanc pour les lus
+    # Bleu léger pour les non-lus, blanc pour les lus
     md_bg_color: (0.9, 0.94, 1, 1) if not self.is_read else (1, 1, 1, 1)
     ripple_behavior: True
-    on_release: root.press_callback(root)
+    on_release: self.press_callback(self) if hasattr(self, 'press_callback') else None
 
     MDBoxLayout:
         orientation: "horizontal"

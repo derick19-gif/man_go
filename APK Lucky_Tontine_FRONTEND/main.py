@@ -166,20 +166,18 @@ class NotificationManager:
                 break
         self._save()
 
-class NotificationItem(MDBoxLayout):
-    """ Classe représentant une ligne de notification dans la liste """
-    title = StringProperty()
-    message = StringProperty()
-    date = StringProperty()
-    is_read = BooleanProperty(False)
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # La structure visuelle est définie dans ton fichier notifications.kv
-        
-    def press_callback(self, instance):
-        # Cette fonction est appelée lors du clic (défini dans le .kv)
-        pass
+class NotificationItem(MDCard):
+  """Classe représentant une ligne de notification dans la liste."""
+
+  title = StringProperty("")
+  message = StringProperty("")
+  date = StringProperty("")
+  is_read = BooleanProperty(False)
+
+  def press_callback(self, instance):
+    # Logique lors du clic sur la notification (ex: marquer comme lu)
+    self.is_read = True
 
 class SplashScreen(Screen):
     def on_enter(self):
