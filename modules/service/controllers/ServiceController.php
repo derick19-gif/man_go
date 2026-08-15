@@ -10,7 +10,8 @@ class ServiceController extends Controller {
      * Affiche la liste de tous les services disponibles avec filtrage dynamique
      */
     public function index() {
-        $db = Database::getInstance()->getConnection();
+        // Utilisation directe de l'instance PDO retournée par Database::getInstance()
+        $db = Database::getInstance();
         
         // Récupération des services depuis la base de données de manière sécurisée
         try {
@@ -25,8 +26,8 @@ class ServiceController extends Controller {
             $services = [];
         }
 
-        // Chargement de la vue dédiée aux services
-        $this->render('services/index', [
+        // Chargement de la vue dédiée aux services (avec return pour éviter la page blanche)
+        return $this->render('services/index', [
             'title' => 'Services Professionnels & Prestations - MAN GO',
             'services' => $services
         ]);
@@ -36,7 +37,7 @@ class ServiceController extends Controller {
      * Affiche le détail d'un service spécifique
      */
     public function show($id) {
-        $db = Database::getInstance()->getConnection();
+        $db = Database::getInstance();
         
         $stmt = $db->prepare("SELECT s.*, st.name as stand_name, st.phone as stand_phone, st.email as stand_email 
                               FROM services s 
@@ -51,7 +52,7 @@ class ServiceController extends Controller {
             return;
         }
 
-        $this->render('services/detail', [
+        return $this->render('services/detail', [
             'title' => htmlspecialchars($service['title']) . ' - MAN GO',
             'service' => $service
         ]);
