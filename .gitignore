@@ -1,0 +1,6 @@
+*.db
+user_data.json
+*.PNG
+*.jpg
+__pycache__/
+*.pyc

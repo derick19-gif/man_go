@@ -1,0 +1,164 @@
+<GroupScreen>:
+    name: "group_screen"
+    
+    MDBoxLayout:
+        orientation: 'vertical'
+        md_bg_color: 1, 1, 1, 1
+
+        # Toolbar supérieure (Nom du groupe + Info)
+        MDTopAppBar:
+            title: "Lucky Tontine : " + root.group_name
+            elevation: 2
+            left_action_items: [["arrow-left", lambda x: app.change_screen('dashboard')]]
+            right_action_items: [["phone-voice", lambda x: root.open_voice_chat()], ["dots-vertical", lambda x: root.open_menu()]]
+            md_bg_color: 0, 0.4, 0.2, 1 # Vert profond
+
+        ScrollView:
+            MDBoxLayout:
+                orientation: 'vertical'
+                adaptive_height: True
+                padding: dp(15)
+                spacing: dp(20)
+
+                # --- ZONE INFO POT ---
+                MDCard:
+                    size_hint_y: None
+                    height: dp(100)
+                    radius: [20,]
+                    padding: dp(15)
+                    md_bg_color: 0.9, 0.95, 0.9, 1
+                    
+                    MDBoxLayout:
+                        orientation: 'vertical'
+                        MDLabel:
+                            text: "POT TOTAL ACTUEL"
+                            halign: "center"
+                            font_style: "Caption"
+                        MDLabel:
+                            text: root.pot_total + " FCFA"
+                            halign: "center"
+                            font_style: "H4"
+                            theme_text_color: "Custom"
+                            text_color: 0, 0.5, 0, 1
+
+                # --- LISTE DES MEMBRES (Simplifié pour l'exemple) ---
+                MDLabel:
+                    text: "Membres du groupe"
+                    font_style: "Subtitle1"
+                    bold: True
+
+                MDList:
+                    id: members_list
+                    # Ici les membres seront ajoutés dynamiquement par le Python
+
+                # --- ZONE ADMINISTRATION (Le Bloc Caché) ---
+                # Ce bloc n'apparaît QUE pour le parrain
+                MDBoxLayout:
+                    id: admin_layout
+                    orientation: 'vertical'
+                    adaptive_height: True
+                    spacing: dp(15)
+                    padding: dp(15)
+                    opacity: 0
+                    disabled: True
+                    
+                    canvas.before:
+                        Color:
+                            rgba: 0.95, 0.95, 0.95, 1
+                        RoundedRectangle:
+                            size: self.size
+                            pos: self.pos
+                            radius: [15,]
+
+                    MDLabel:
+                        text: "GESTION DE L'ENCHÈRE"
+                        halign: "center"
+                        font_style: "Button"
+                        theme_text_color: "Secondary"
+
+                    MDTextField:
+                        id: auction_input
+                        hint_text: "Montant laissé par le gagnant"
+                        mode: "outlined"
+                        input_filter: "int"
+                        icon_left: "gavel"
+
+                    MDRaisedButton:
+                        text: "LANCER LA DISTRIBUTION"
+                        pos_hint: {"center_x": .5}
+                        size_hint_x: 0.9
+                        height: dp(50)
+                        md_bg_color: 0, 0.6, 0.3, 1
+                        on_release: root.submit_auction_result(auction_input.text)
+
+        # --- BARRE DE CHAT (Bas de l'écran) ---
+        MDBoxLayout:
+            size_hint_y: None
+            height: dp(60)
+            padding: [dp(10), dp(5)]
+            spacing: dp(10)
+            md_bg_color: 0.98, 0.98, 0.98, 1
+
+            MDIconButton:
+                icon: "emoticon-outline"
+            
+            MDTextField:
+                hint_text: "Message..."
+                mode: "fill"
+                fill_color: 0, 0, 0, 0.05
+                radius: [25, 25, 25, 25]
+            
+            # Bloc à insérer dans le footer du chat dans group_screen.kv
+            MDIconButton:
+                icon: "microphone"
+                theme_text_color: "Custom"
+                text_color: 0, 0.4, 0.2, 1
+                # Logique de pression longue pour le vocal
+                on_press: root.start_voice_record()
+                on_release: root.stop_and_send_voice()
+
+                # Animation visuelle (Optionnel mais Pro)
+                canvas.after:
+                    Color:
+                        rgba: (1, 0, 0, 0.3) if self.state == 'down' else (0,0,0,0)
+                    Ellipse:
+                        size: self.size
+                        pos: self.pos
+
+<VoiceMessageWidget@MDBoxLayout>:
+    orientation: 'vertical'
+    size_hint_x: 0.7
+    padding: dp(10)
+    spacing: dp(5)
+    md_bg_color: 0.9, 1, 0.9, 1 if root.is_me else 1, 1, 1, 1
+    radius: [15, 15, 15, 0] if root.is_me else [15, 15, 0, 15]
+    pos_hint: {'right': 1} if root.is_me else {'left': 1}
+
+    MDBoxLayout:
+        orientation: 'horizontal'
+        MDIconButton:
+            icon: "play-circle"
+            on_release: root.play_audio()
+        
+        MDLabel:
+            text: "Message vocal"
+            font_style: "Caption"
+
+    MDBoxLayout:
+        orientation: 'horizontal'
+        size_hint_y: None
+        height: dp(15)
+        spacing: dp(5)
+
+        MDLabel:
+            text: root.send_time
+            font_style: "Overline"
+            halign: "right"
+            theme_text_color: "Hint"
+
+        MDIcon:
+            icon: "check-all"
+            font_size: "12sp"
+            # Bleu si tout le monde a vu, gris sinon
+            theme_text_color: "Custom"
+            text_color: (0, 0.5, 1, 1) if root.is_fully_seen else (0.5, 0.5, 0.5, 1)

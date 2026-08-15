@@ -1,0 +1,40 @@
+# notifications.kv
+
+<NotificationItem>:
+    orientation: "vertical"
+    padding: "12dp"
+    size_hint_y: None
+    height: "85dp"
+    radius: [15, 15, 15, 15]
+    elevation: 1
+    # Bleu WhatsApp très léger pour les non-lus, Blanc pour les lus
+    md_bg_color: (0.9, 0.94, 1, 1) if not self.is_read else (1, 1, 1, 1)
+    ripple_behavior: True
+    on_release: root.press_callback(root)
+
+    MDBoxLayout:
+        orientation: "horizontal"
+        spacing: "10dp"
+        size_hint_y: None
+        height: "30dp"
+        
+        MDLabel:
+            text: root.title
+            bold: True
+            font_style: "Subtitle1"
+            theme_text_color: "Custom"
+            text_color: (0.1, 0.14, 0.49, 1)
+            
+        MDLabel:
+            text: root.date
+            halign: "right"
+            font_style: "Caption"
+            theme_text_color: "Hint"
+
+    MDLabel:
+        text: root.message
+        theme_text_color: "Secondary"
+        font_style: "Body2"
+        valign: "top"
+        shorten: True
+        shorten_from: "right"

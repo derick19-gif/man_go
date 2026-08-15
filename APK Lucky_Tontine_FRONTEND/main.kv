@@ -1,0 +1,1013 @@
+# Composant de Carte de Tontine Dynamique
+<TontineCard>:
+    orientation: 'vertical'
+    size_hint_y: None
+    height: "180dp"
+    padding: "15dp"
+    spacing: "10dp"
+    radius: [20,]
+    md_bg_color: 1, 1, 1, 1
+    elevation: 2
+
+    MDBoxLayout:
+        adaptive_height: True
+        spacing: "10dp"
+        
+        MDIcon:
+            icon: "account-group"
+            theme_text_color: "Custom"
+            text_color: 0.1, 0.14, 0.49, 1
+            size_hint: None, None
+            size: "24dp", "24dp"
+
+        MDLabel:
+            text: root.tontine_name
+            bold: True
+            font_style: "H6"
+            theme_text_color: "Custom"
+            text_color: 0.1, 0.14, 0.49, 1
+
+    MDBoxLayout:
+        orientation: 'vertical'
+        spacing: "5dp"
+        
+        MDLabel:
+            text: f"Mise : {root.mise} F"
+            theme_text_color: "Secondary"
+            font_style: "Subtitle1"
+            
+        MDLabel:
+            text: f"Participants : {root.participants}/{root.max_participants}"
+            theme_text_color: "Hint"
+            font_style: "Caption"
+
+    MDRaisedButton:
+        text: "REJOINDRE LA TONTINE"
+        md_bg_color: 0.1, 0.14, 0.49, 1
+        text_color: 1, 0.84, 0, 1
+        size_hint_x: 1
+        on_release: root.callback_join(root.tontine_id)
+
+# Composant personnalisé pour chaque demande
+<PendingUserItem>:
+    text: root.user_name
+    secondary_text: f"Groupe: {root.group_name}"
+    theme_text_color: "Primary"
+    
+    IconLeftWidget:
+        icon: "account-question"
+        theme_text_color: "Custom"
+        text_color: (0.1, 0.14, 0.49, 1)
+
+    # Conteneur pour les boutons Accepter / Refuser
+    RightDefinitionWidget:
+        MDBoxLayout:
+            adaptive_width: True
+            spacing: "8dp"
+            pos_hint: {"center_y": .5}
+
+            MDIconButton:
+                icon: "check-circle"
+                theme_text_color: "Custom"
+                text_color: 0, 0.6, 0, 1  # Vert
+                on_release: root.callback_approve(root.user_id, root.group_id, root.user_name)
+
+            MDIconButton:
+                icon: "close-circle"
+                theme_text_color: "Custom"
+                text_color: 0.8, 0, 0, 1  # Rouge
+                on_release: root.callback_reject(root.user_id, root.group_id, root.user_name)
+
+
+LuckyTontineManager:
+    SplashScreen:
+    LoginScreen:
+    RegisterScreen:
+    RecoveryScreen:
+    DashboardScreen:
+    HistoryScreen:
+    CreateGroupScreen:
+    JoinGroupScreen:
+    ManageMembersScreen:
+    ReportIssueScreen:
+
+<SplashScreen>:
+    name: 'splash'
+    MDFloatLayout:
+        md_bg_color: 0.1, 0.14, 0.49, 1  # Même bleu que l'appli
+        Image:
+            source: "images/splash_bg.png"
+            allow_stretch: True
+            keep_ratio: False
+
+<LoginScreen>:
+    name: 'login'
+    MDBoxLayout:
+        orientation: 'vertical'
+        padding: "25dp"
+        spacing: "15dp"
+        md_bg_color: 0.1, 0.14, 0.49, 1
+
+        # --- LOGO PRINCIPAL ---
+        Image:
+            source: "images/logo_icon.png"
+            size_hint: None, None
+            size: "180dp", "180dp"
+            pos_hint: {"center_x": .5}
+        Widget: 
+            size_hint_y: None
+            height: "20dp"
+
+        # --- Champ Téléphone ---
+        MDTextField:
+            id: login_phone
+            hint_text: "Numéro de téléphone"
+            mode: "rectangle"
+            icon_right: "phone"
+            input_filter: "int"
+            # Couleurs pour une visibilité parfaite sur bleu
+            text_color_normal: 1, 1, 1, 1
+            text_color_focus: 1, 1, 1, 1
+            hint_text_color_normal: 1, 1, 1, 0.6
+            hint_text_color_focus: 1, 0.84, 0, 1 # Devient Or quand on clique
+            line_color_normal: 1, 1, 1, 0.5
+            line_color_focus: 1, 0.84, 0, 1 # Ligne Or quand on clique
+            icon_right_color_focus: 1, 0.84, 0, 1
+
+        # --- Champ Code PIN (4 chiffres) ---
+        MDTextField:
+            id: login_pin
+            hint_text: "Code PIN (4 chiffres)"
+            mode: "rectangle"
+            icon_right: "key-variant"
+            password: True
+            max_text_length: 4
+            input_filter: "int"
+            # Couleurs pour une visibilité parfaite
+            text_color_normal: 1, 1, 1, 1
+            text_color_focus: 1, 1, 1, 1
+            hint_text_color_normal: 1, 1, 1, 0.6
+            hint_text_color_focus: 1, 0.84, 0, 1
+            line_color_normal: 1, 1, 1, 0.5
+            line_color_focus: 1, 0.84, 0, 1
+            icon_right_color_focus: 1, 0.84, 0, 1
+
+        MDFillRoundFlatButton:
+            text: "CONNEXION SÉCURISÉE"
+            md_bg_color: 1, 0.84, 0, 1
+            text_color: 0.1, 0.14, 0.49, 1 # Texte bleu foncé sur bouton Or
+            pos_hint: {"center_x": .5}
+            size_hint_x: 0.8
+            # CORRECTION ICI : Utilisation des bons IDs
+            on_release: app.process_login(login_phone.text, login_pin.text)
+        
+        MDTextButton:
+            text: "[u]Mot de passe oublié ?[/u]"
+            markup: True
+            theme_text_color: "Custom"
+            text_color: 1, 1, 1, 1
+            pos_hint: {"center_x": .5}
+            on_release: root.manager.current = 'recovery'
+
+        MDTextButton:
+            text: "Pas de compte ? S'inscrire"
+            pos_hint: {"center_x": .5}
+            theme_text_color: "Custom"
+            text_color: 1, 1, 1, 1
+            on_release: root.manager.current = 'register'
+
+<RegisterScreen>:
+    name: 'register'
+    MDScrollView:
+        MDBoxLayout:
+            orientation: 'vertical'
+            padding: "25dp"
+            spacing: "12dp"
+            adaptive_height: True
+            md_bg_color: 0.95, 0.95, 0.97, 1
+
+            MDLabel:
+                text: "CRÉER UN COMPTE"
+                halign: "center"
+                font_style: "H5"
+                bold: True
+                theme_text_color: "Custom"
+                text_color: 0.1, 0.14, 0.49, 1
+                size_hint_y: None
+                height: "60dp"
+
+            # --- Champ Nom ---
+            MDTextField:
+                id: reg_full
+                hint_text: "Nom Complet"
+                mode: "rectangle"
+                icon_left: "account"
+
+            # --- Bloc Téléphone Moderne ---
+            MDBoxLayout:
+                orientation: 'horizontal'
+                spacing: "5dp"
+                size_hint_y: None
+                height: "60dp"
+                
+                MDRaisedButton:
+                    id: country_select
+                    text: "PAYS" # 👈 Changé pour inviter au choix
+                    size_hint_x: 0.3
+                    md_bg_color: 1, 1, 1, 1
+                    text_color: 0.1, 0.14, 0.49, 1 # Couleur de ton thème pour attirer l'œil
+                    on_release: app.open_country_menu(self)
+                
+                MDTextField:
+                    id: reg_phone
+                    hint_text: "Numéro de téléphone"
+                    mode: "rectangle"
+                    input_filter: "int"
+                    icon_left: "phone" # Icône pour le look moderne
+
+            # --- Champ Email ---
+            MDTextField:
+                id: reg_email
+                hint_text: "Email de récupération"
+                mode: "rectangle"
+                icon_left: "email"
+
+            # --- Code PIN de Sécurité (4 chiffres) ---
+            MDTextField:
+                id: reg_pass
+                hint_text: "Créer votre PIN (4 chiffres)"
+                password: True
+                mode: "rectangle"
+                icon_left: "numeric-4-box-outline"
+                input_filter: "int"          # Active le pavé numérique
+                max_text_length: 4           # Limite visuelle et blocage
+                helper_text: "Ce code sera demandé à chaque connexion"
+                helper_text_mode: "on_focus"
+
+            MDTextField:
+                id: reg_confirm_pass
+                hint_text: "Confirmer votre PIN"
+                password: True
+                mode: "rectangle"
+                icon_left: "numeric-4-box-outline"
+                input_filter: "int"
+                max_text_length: 4
+
+            MDSeparator:
+
+            MDLabel:
+                text: "Sécurité de récupération"
+                font_style: "Subtitle2"
+                size_hint_y: None
+                height: "30dp"
+
+            # --- QUESTION DE SÉCURITÉ ---
+            MDRaisedButton:
+                id: question_spinner
+                text: "Choisir une question de sécurité"
+                size_hint_x: 1
+                md_bg_color: 1, 1, 1, 1
+                text_color: 0, 0, 0, 1
+                on_release: app.open_question_menu(self)
+
+            MDTextField:
+                id: reg_answer
+                hint_text: "Votre réponse"
+                mode: "rectangle"
+                icon_left: "key-variant"
+                helper_text: "Majuscules ignorées à la récupération"
+                helper_text_mode: "on_focus"
+
+            MDTextField:
+                id: reg_ref
+                hint_text: "Code Parrain (Si membre)"
+                mode: "rectangle"
+                icon_left: "account-group"
+
+            # --- BOUTON DE VALIDATION (FINAL) ---
+            MDFillRoundFlatButton:
+                text: "S'INSCRIRE"
+                md_bg_color: 0.1, 0.14, 0.49, 1
+                pos_hint: {"center_x": .5}
+                size_hint_x: 1
+                on_release: 
+                    # L'ordre doit correspondre à ton process_register dans main.py
+                    app.process_register(
+                    reg_full.text, 
+                    reg_email.text, 
+                    reg_pass.text, 
+                    reg_confirm_pass.text, 
+                    question_spinner.text, 
+                    reg_answer.text, 
+                    reg_phone.text
+                    )
+
+            # --- LIEN RETOUR CONNEXION ---
+            MDTextButton:
+                text: "Déjà inscrit ? Connectez-vous"
+                pos_hint: {"center_x": .5}
+                theme_text_color: "Hint"
+                on_release: root.manager.current = 'login'
+                
+            Widget:
+                size_hint_y: None
+                height: "20dp" # Petit espace de sécurité en bas
+
+<RecoveryScreen>:
+    name: 'recovery'
+    MDBoxLayout:
+        orientation: 'vertical'
+        padding: "20dp"
+        spacing: "15dp"
+        md_bg_color: 0.95, 0.95, 0.97, 1
+
+        MDIconButton:
+            icon: "arrow-left"
+            pos_hint: {"center_y": .5}
+            on_release: root.manager.current = 'login'
+
+        MDLabel:
+            text: "RÉCUPÉRATION DE COMPTE"
+            halign: "center"
+            bold: True
+            font_style: "H6"
+
+        MDTextField:
+            id: recover_id
+            hint_text: "Email ou Numéro de téléphone"
+            mode: "rectangle"
+            icon_right: "account-search"
+
+        MDFillRoundFlatButton:
+            text: "RECHERCHER MON COMPTE"
+            pos_hint: {"center_x": .5}
+            on_release: app.find_account_for_recovery(recover_id.text)
+
+        MDBoxLayout:
+            id: step2
+            orientation: 'vertical'
+            spacing: "15dp"
+            opacity: 0 # Caché tant qu'on n'a pas trouvé le compte
+            
+            MDLabel:
+                id: display_question
+                text: "Votre question s'affichera ici"
+                halign: "center"
+                italic: True
+
+            MDTextField:
+                id: recover_answer
+                hint_text: "Entrez votre réponse"
+                mode: "rectangle"
+
+            MDFillRoundFlatButton:
+                text: "VÉRIFIER ET RÉINITIALISER"
+                md_bg_color: 0.1, 0.5, 0.2, 1
+                pos_hint: {"center_x": .5}
+                on_release: app.final_reset(recover_id.text, recover_answer.text)
+
+<DashboardScreen>:
+    name: 'dashboard'
+
+    MDNavigationLayout:
+        ScreenManager:
+            Screen:
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    md_bg_color: 0.95, 0.95, 0.97, 1
+
+                    # --- LA BARRE DOIT ÊTRE ICI (1er enfant du BoxLayout) ---
+                    MDFloatLayout: 
+                        size_hint_y: None
+                        height: "56dp"
+
+                        MDTopAppBar:
+                            title: "Lucky Tontine"
+                            anchor_title: "center"
+                            # AJUSTEMENT TITRE : On ajoute du padding à droite (72dp)
+                            # pour équilibrer l'espace pris par le menu à gauche.
+                            title_item_padding: [0, 0, "72dp", 0]
+                            elevation: 4
+                            md_bg_color: 0.1, 0.14, 0.49, 1
+                            specific_text_color: 1, 0.84, 0, 1
+                            left_action_items: [["menu", lambda x: nav_drawer.set_state("open")]]
+                            right_action_items: [["", lambda x: None]]
+                            pos_hint: {"top": 1} # FORCE LA POSITION EN HAUT DU FLOAT
+
+                        # --- CLOCHE DE NOTIFICATION ---
+                        AnchorLayout:
+                            anchor_x: 'right'
+                            anchor_y: 'center'
+                            size_hint: None, None
+                            size: "56dp", "56dp"
+                            pos_hint: {"top": 1, "right": 1}
+                            # AJUSTEMENT CLOCHE : Le 1er chiffre (8dp) pousse le contenu vers le bas
+                            padding: [0, "8dp", "10dp", 0]
+                            
+                            RelativeLayout:
+                                size_hint: None, None
+                                size: "48dp", "48dp"
+
+                                MDIconButton:
+                                    icon: "bell-outline"
+                                    theme_text_color: "Custom"
+                                    text_color: 1, 1, 1, 1
+                                    pos_hint: {"center_x": .5, "center_y": .5}
+                                    on_release: root.open_notification_panel()
+
+                                # Badge Rouge
+                                MDCard:
+                                    id: notif_badge_container
+                                    size_hint: None, None
+                                    size: "16dp", "16dp"
+                                    radius: [8,]
+                                    md_bg_color: 1, 0, 0, 1
+                                    elevation: 0 
+                                    pos_hint: {"center_x": .7, "center_y": .7}
+                                    opacity: 1 if root.unread_count > 0 else 0
+
+                                    MDLabel:
+                                        text: str(root.unread_count)
+                                        halign: "center"
+                                        font_size: "9sp"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 1, 1, 1
+                                        bold: True
+
+                    # =========================================================
+                    # 2ème ÉLÉMENT (DESSOUS) : LE CONTENU DÉROULANT (SOLDE, ETC.)
+                    # =========================================================
+                    MDScrollView:
+                        do_scroll_x: False
+                        MDBoxLayout:
+                            id: container
+                            orientation: 'vertical'
+                            adaptive_height: True
+                            padding: "16dp"
+                            spacing: "20dp"
+
+
+                            # --- BLOC A : BIENVENUE & ANNONCE ---
+                            MDBoxLayout:
+                                orientation: 'vertical'
+                                adaptive_height: True
+                                spacing: "5dp"
+                                MDLabel:
+                                    text: f"Bienvenue, {root.user_fullname}"
+                                    font_style: "H6"
+                                    bold: True
+                                MDCard:
+                                    size_hint_y: None
+                                    height: "40dp"
+                                    md_bg_color: 1, 0.84, 0, 0.1
+                                    radius: [8,]
+                                    padding: "10dp"
+                                    MDLabel:
+                                        text: root.announcement_text
+                                        font_style: "Caption"
+                                        theme_text_color: "Secondary"
+                                        italic: True
+
+                            # --- BLOC B : CARTE BANCAIRE "PREMIUM" ---
+                            MDCard:
+                                size_hint: 1, None
+                                height: "180dp"
+                                radius: [20,]
+                                md_bg_color: 0.1, 0.14, 0.49, 1
+                                orientation: 'vertical'
+                                padding: "20dp"
+                                elevation: 6
+
+                                MDBoxLayout:
+                                    MDLabel:
+                                        text: "SOLDE DISPONIBLE"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 1, 1, 0.6
+                                        font_style: "Caption"
+                                    MDIcon:
+                                        icon: "chip"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 0.84, 0, 1
+
+                                MDLabel:
+                                    text: root.user_balance
+                                    theme_text_color: "Custom"
+                                    text_color: 1, 0.84, 0, 1
+                                    font_style: "H3"
+                                    bold: True
+
+                                MDSeparator:
+                                    color: 1, 1, 1, 0.1
+
+                                MDBoxLayout:
+                                    orientation: 'horizontal'
+                                    padding: [0, 10, 0, 0]
+                                    MDBoxLayout:
+                                        orientation: 'vertical'
+                                        MDLabel:
+                                            text: "Économies via Enchères"
+                                            theme_text_color: "Custom"
+                                            text_color: 1, 1, 1, 0.7
+                                            font_style: "Caption"
+                                        MDLabel:
+                                            text: "+ 12.500 F"
+                                            theme_text_color: "Custom"
+                                            text_color: 0, 1, 0.5, 1
+                                            bold: True
+                                    MDIconButton:
+                                        icon: "information-outline"
+                                        theme_text_color: "Custom"
+                                        text_color: 1, 1, 1, 0.5
+
+                            # --- BLOC C : BOUTONS DE TRANSACTION ---
+                            MDGridLayout:
+                                cols: 3
+                                spacing: "10dp"
+                                adaptive_height: True
+                                
+                                MDIconButton:
+                                    icon: "plus-circle"
+                                    md_bg_color: 0.1, 0.14, 0.49, 1
+                                    theme_text_color: "Custom"
+                                    text_color: 1, 0.84, 0, 1
+                                    on_release: app.open_create_group_modal()
+                                
+                                MDFillRoundFlatIconButton:
+                                    icon: "wallet-plus"
+                                    text: "DÉPÔT"
+                                    md_bg_color: 0, 0.6, 0.3, 1
+                                    size_hint_x: 1
+                                
+                                MDFillRoundFlatIconButton:
+                                    icon: "wallet-minus"
+                                    text: "RETRAIT"
+                                    md_bg_color: 0.8, 0.1, 0.1, 1
+                                    size_hint_x: 1
+
+                            # [LA SUITE AVEC LES TONTINES ET LE MENU COULISSANT DANS LE BLOC 2...]
+                            # --- BLOC D : SECTION POT DE CHANCE (GAMIFICATION) ---
+                            MDCard:
+                                size_hint: 1, None
+                                height: "80dp"
+                                radius: [15,]
+                                padding: "12dp"
+                                md_bg_color: 1, 0.84, 0, 0.1
+                                line_color: 1, 0.84, 0, 1
+                                elevation: 1
+                                MDBoxLayout:
+                                    orientation: 'horizontal'
+                                    spacing: "10dp"
+                                    MDIcon:
+                                        icon: "clover"
+                                        theme_text_color: "Custom"
+                                        text_color: 0, 0.5, 0.2, 1
+                                    MDBoxLayout:
+                                        orientation: 'vertical'
+                                        MDLabel:
+                                            text: "POT DE CHANCE FIDÉLITÉ"
+                                            font_style: "Caption"
+                                            bold: True
+                                        MDLabel:
+                                            text: "25.000 FCFA"
+                                            font_style: "H6"
+                                            text_color: 0.1, 0.14, 0.49, 1
+                                            theme_text_color: "Custom"
+                                    MDFillRoundFlatButton:
+                                        text: "TIRAGE"
+                                        md_bg_color: 0.1, 0.5, 0.1, 1
+                                        on_release: root.lancer_processus_tirage()
+
+                            # --- BLOC E : MES TONTINES (LISTE PROFESSIONNELLE) ---
+                            MDBoxLayout:
+                                orientation: 'vertical'
+                                adaptive_height: True
+                                MDLabel:
+                                    text: "Mes Tontines actives"
+                                    font_style: "Subtitle1"
+                                    bold: True
+                                MDIconButton:
+                                    icon: "filter-variant"
+                            
+                            MDBoxLayout:
+                                id: container  # <--- C'est ici que Python va "coller" les cartes
+                                orientation: 'vertical'
+                                adaptive_height: True
+                                spacing: "30dp"
+
+                                Widget:
+                                    size_hint_y: None
+                                    height: "12dp"  # <--- AUGMENTE ICI POUR POUSSER LE BOUTON VERS LE BAS
+
+                                MDBoxLayout:
+                                    orientation: 'horizontal'
+                                    size_hint_y: None
+                                    height: "40dp"
+
+                                    MDLabel:
+                                        text: "Prochain tour: " + root.next_round_day
+                                        font_style: "Caption"
+                                        theme_text_color: "Secondary"
+                                        size_hint_x: 0.4  # Prend un peu de place à gauche
+
+                                    ScrollView:
+                                        id: lucky_scroll
+                                        do_scroll_x: True
+                                        do_scroll_y: False
+                                        bar_width: 0
+                                        size_hint_x: 0.6
+
+                                        MDBoxLayout: 
+                                            orientation: "horizontal"
+                                            adaptive_width: True
+                                            padding: ["5dp", "0dp"]
+
+                                            MDFillRoundFlatButton:
+                                                id: lucky_badge
+                                                opacity: 1 if root.is_lucky_visible else 0
+                                                disabled: not root.is_lucky_visible
+                                                text: root.lucky_status_text
+                                                icon: "clock-outline" if root.timer_active else "star-circle"
+                                                md_bg_color: (0.1, 0.14, 0.49, 1) if root.timer_active else (0, 0.6, 0.3, 1)
+                                                size_hint: None, None
+                                                height: "32dp"
+                                                # Calcul dynamique de la largeur pour éviter que le texte ne dépasse
+                                                width: self.texture_size[0] + dp(35) if hasattr(self, 'texture_size') else dp(150)
+                                                on_release: 
+                                                    # Si le chrono est fini, on réaffiche le dialogue, sinon on affiche une info
+                                                    if not root.timer_active: root.show_winner_dialog()
+                                                    else: app.show_toast("Le tirage n'a pas encore eu lieu.", "info")
+
+                            Widget:
+                                size_hint_y: None
+                                height: "30dp"
+
+        # --- MENU COULISSANT (NAV DRAWER) ---
+        MDNavigationDrawer:
+            id: nav_drawer
+            radius: (0, 16, 16, 0)
+            md_bg_color: 0.98, 0.98, 1, 1
+
+            MDBoxLayout:
+                orientation: 'vertical'
+                padding: "16dp"
+                spacing: "15dp"  # Augmenté pour aérer globalement
+
+                # Header du Menu (Logo + Infos Utilisateur)
+                MDBoxLayout:
+                    orientation: 'vertical'
+                    adaptive_height: True
+                    padding: ["0dp", "20dp", "0dp", "20dp"]  # Ajoute du souffle en haut et en bas
+                    spacing: "15dp"  # Espace global entre les blocs internes
+
+                    # --- LOGO ICONE (AGRANDI) ---
+                    Image:
+                        source: "images/logo_icon.png"  # Utilisation du logo transparent
+                        size_hint: None, None
+                        size: "120dp", "120dp"  # Augmenté de 80dp à 120dp
+                        pos_hint: {"center_x": .5}
+
+                    # Conteneur vertical pour les textes afin de contrôler leur écartement précis
+                    MDBoxLayout:
+                        orientation: 'vertical'
+                        adaptive_height: True
+                        spacing: "20dp"  # <--- C'est ici qu'on gère l'écart entre le Nom et Membre Gold
+
+                        MDLabel:
+                            text: root.user_fullname
+                            font_style: "H6"
+                            bold: True
+                            halign: "center"
+                            theme_text_color: "Primary"
+
+                        MDLabel:
+                            text: "Membre Gold"
+                            font_style: "Button" # Style plus structuré que Caption
+                            theme_text_color: "Custom"
+                            text_color: 0.1, 0.5, 0.1, 1 # Un vert discret pour le statut Gold
+                            halign: "center"
+
+                # --- SÉPARATEUR ÉLÉGANT ---
+                MDSeparator:
+                    height: "1dp"
+
+                # Espace tampon avant la liste
+                Widget:
+                    size_hint_y: None
+                    height: "10dp"
+
+                # Options du Menu
+                MDList:
+                    OneLineIconListItem:
+                        text: "Mon Profil"
+                        on_release: nav_drawer.set_state("close")
+                        IconLeftWidget:
+                            icon: "account-edit-outline"
+                    
+                    OneLineIconListItem:
+                        text: "Historique des gains"
+                        IconLeftWidget:
+                            icon: "chart-line"
+
+                    OneLineIconListItem:
+                        text: "Sécurité & PIN"
+                        IconLeftWidget:
+                            icon: "shield-lock-outline"
+
+                    OneLineIconListItem:
+                        text: "ASSISTANCE 24h/7j"
+                        on_release: app.open_support()
+                        IconLeftWidget:
+                            icon: "headphones"
+                            theme_text_color: "Custom"
+                            text_color: 0, 0.6, 0.3, 1
+
+                    OneLineIconListItem:
+                        text: "Déconnexion"
+                        on_release: app.logout()
+                        IconLeftWidget:
+                            icon: "logout"
+                            theme_text_color: "Custom"
+                            text_color: 0.8, 0.1, 0.1, 1
+
+<HistoryScreen>:
+    name: 'history'
+    MDBoxLayout:
+        orientation: 'vertical'
+        
+        MDTopAppBar:
+            title: "Historique"
+            left_action_items: [["arrow-left", lambda x: app.go_back()]]
+            md_bg_color: 0.1, 0.14, 0.49, 1
+            specific_text_color: 1, 0.84, 0, 1
+
+        MDScrollView:
+            MDList:
+                id: history_list
+        
+<CreateGroupScreen>:
+    name: 'create_group'
+    MDBoxLayout:
+        orientation: 'vertical'
+        md_bg_color: 0.96, 0.97, 0.98, 1
+
+        # --- Barre de Navigation Supérieure ---
+        MDTopAppBar:
+            title: "Paramétrage de la Tontine"
+            elevation: 3
+            md_bg_color: 0.1, 0.14, 0.49, 1
+            left_action_items: [["arrow-left", lambda x: setattr(root.manager, 'current', 'dashboard')]]
+
+        MDScrollView:
+            do_scroll_x: False
+            MDBoxLayout:
+                orientation: 'vertical'
+                padding: "20dp"
+                spacing: "22dp"
+                adaptive_height: True
+
+                # --- Carte d'information Parrain ---
+                MDCard:
+                    size_hint: 1, None
+                    height: "130dp"
+                    radius: [20,]
+                    md_bg_color: 1, 1, 1, 1
+                    padding: "20dp"
+                    elevation: 1
+                    
+                    MDBoxLayout:
+                        orientation: 'horizontal'
+                        spacing: "15dp"
+                        MDIcon:
+                            icon: "shield-crown"
+                            font_size: "64sp"
+                            theme_text_color: "Custom"
+                            text_color: 0.1, 0.14, 0.49, 1
+                        MDBoxLayout:
+                            orientation: 'vertical'
+                            spacing: "5dp"
+                            MDLabel:
+                                text: "VOTRE RÔLE : PARRAIN"
+                                bold: True
+                                font_style: "Subtitle1"
+                                theme_text_color: "Primary"
+                            MDLabel:
+                                text: "Vous avez le contrôle total sur les tours et les participants du groupe."
+                                font_style: "Caption"
+                                theme_text_color: "Secondary"
+
+                # --- Section Formulaire ---
+                MDLabel:
+                    text: "Configuration du Groupe"
+                    bold: True
+                    font_style: "H6"
+                    theme_text_color: "Primary"
+
+                MDTextField:
+                    id: group_name
+                    hint_text: "Nom du Groupe (ex: Les Élites du 228)"
+                    mode: "rectangle"
+                    icon_right: "account-group-outline"
+                    fill_color_normal: 1, 1, 1, 1
+
+                MDTextField:
+                    id: target_amount
+                    hint_text: "Montant de la mise (FCFA)"
+                    helper_text: "Ce montant sera prélevé à chaque cycle"
+                    helper_text_mode: "on_focus"
+                    mode: "rectangle"
+                    input_filter: "int"
+                    icon_right: "cash-multiple"
+
+                MDSeparator:
+
+                # --- Section Date et Fréquence ---
+                MDLabel:
+                    text: "Calendrier et Fréquence"
+                    bold: True
+                    font_style: "Subtitle1"
+
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: "10dp"
+                    
+                    # Bouton pour ouvrir le Calendrier
+                    MDRectangleFlatIconButton:
+                        icon: "calendar-edit"
+                        text: root.first_due_date
+                        size_hint_x: 0.5
+                        on_release: root.show_date_picker()
+
+                    # Label informatif
+                    MDLabel:
+                        text: "Heure par défaut : 00:00 GMT"
+                        font_style: "Caption"
+                        theme_text_color: "Hint"
+
+                # --- Fréquences Étendues ---
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: "8dp"
+                    padding: [0, "10dp", 0, 0]
+                    # On utilise un ScrollView horizontal si les choix sont nombreux
+                    ScrollView:
+                        do_scroll_y: False
+                        size_hint_y: None
+                        height: "45dp"
+                        MDBoxLayout:
+                            adaptive_width: True
+                            spacing: "8dp"
+                            
+                            MDFillRoundFlatButton:
+                                text: "Hebdo"
+                                md_bg_color: (0.1, 0.14, 0.49, 1) if root.group_frequency == "Hebdomadaire" else (0.8, 0.8, 0.8, 1)
+                                on_release: root.group_frequency = "Hebdomadaire"
+                            
+                            MDFillRoundFlatButton:
+                                text: "Mensuel"
+                                md_bg_color: (0.1, 0.14, 0.49, 1) if root.group_frequency == "Mensuelle" else (0.8, 0.8, 0.8, 1)
+                                on_release: root.group_frequency = "Mensuelle"
+
+                            MDFillRoundFlatButton:
+                                text: "Trimestriel"
+                                md_bg_color: (0.1, 0.14, 0.49, 1) if root.group_frequency == "Trimestrielle" else (0.8, 0.8, 0.8, 1)
+                                on_release: root.group_frequency = "Trimestrielle"
+
+                            MDFillRoundFlatButton:
+                                text: "Annuel"
+                                md_bg_color: (0.1, 0.14, 0.49, 1) if root.group_frequency == "Annuelle" else (0.8, 0.8, 0.8, 1)
+                                on_release: root.group_frequency = "Annuelle"
+
+                # --- Bouton d'Action Final ---
+                MDRaisedButton:
+                    text: "CRÉER LE GROUPE & OBTENIR LE CODE"
+                    size_hint_x: 1
+                    height: "60dp"
+                    md_bg_color: 0.1, 0.14, 0.49, 1
+                    font_style: "Button"
+                    on_release: root.valider_et_preparer()
+
+                MDLabel:
+                    text: "Les données sont sécurisées et synchronisées avec le serveur."
+                    halign: "center"
+                    font_style: "Caption"
+                    theme_text_color: "Hint"
+
+<JoinGroupScreen>:
+    name: "join_group"
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: "20dp"
+        spacing: "20dp"
+
+        MDLabel:
+            text: "REJOINDRE UNE TONTINE"
+            halign: "center"
+            font_style: "H5"
+            bold: True
+
+        MDTextField:
+            id: group_code_input
+            hint_text: "Entrez le Code d'Invitation"
+            helper_text: "Exemple: LUCKY-XXXX"
+            helper_text_mode: "on_focus"
+            icon_right: "key-variant"
+            mode: "rectangle"
+            font_size: "24sp"
+
+        MDLabel:
+            text: "Le code est généralement fourni par le parrain du groupe via un lien ou message."
+            theme_text_color: "Hint"
+            font_style: "Caption"
+
+        MDFillRoundFlatButton:
+            text: "VÉRIFIER ET REJOINDRE"
+            pos_hint: {"center_x": .5}
+            size_hint_x: 0.8
+            md_bg_color: (0.1, 0.14, 0.49, 1)
+            on_release: root.valider_rejoindre()
+
+        Widget:
+            size_hint_y: None
+            height: "50dp"
+    
+<ManageMembersScreen>:
+    name: "manage_members"
+    MDBoxLayout:
+        orientation: "vertical"
+        md_bg_color: self.theme_cls.bg_normal
+
+        MDTopAppBar:
+            title: "Demandes d'adhésion"
+            anchor_title: "left"
+            left_action_items: [["arrow-left", lambda x: root.retour_dashboard()]]
+            elevation: 4
+            md_bg_color: (0.1, 0.14, 0.49, 1)
+
+        MDBoxLayout:
+            orientation: "vertical"
+            padding: "10dp"
+            
+            MDLabel:
+                text: "VALIDEZ VOS FUTURS MEMBRES"
+                font_style: "Overline"
+                theme_text_color: "Secondary"
+                adaptive_height: True
+                padding_y: "10dp"
+
+            ScrollView:
+                do_scroll_x: False
+                MDList:
+                    id: container_requests
+                    spacing: "10dp"
+
+# Interface de Signalement (Report)
+<ReportIssueScreen>:
+    name: "report_screen"
+    MDBoxLayout:
+        orientation: "vertical"
+        md_bg_color: self.theme_cls.bg_normal
+
+        MDTopAppBar:
+            title: "Signaler un problème"
+            left_action_items: [["arrow-left", lambda x: root.retour()]]
+            md_bg_color: (0.1, 0.14, 0.49, 1)
+
+        ScrollView:
+            MDBoxLayout:
+                orientation: "vertical"
+                padding: "20dp"
+                spacing: "20dp"
+                adaptive_height: True
+
+                MDLabel:
+                    text: "Aidez-nous à maintenir la sécurité de la tontine."
+                    font_style: "Subtitle1"
+                    bold: True
+                    halign: "center"
+
+                # Raison du signalement
+                MDTextField:
+                    id: report_reason
+                    hint_text: "Sujet du signalement"
+                    helper_text: "Ex: Comportement du parrain, Fraude, Bug"
+                    helper_text_mode: "on_focus"
+                    mode: "fill"
+                    icon_right: "alert-octagon"
+
+                # Détails du signalement
+                MDTextField:
+                    id: report_details
+                    hint_text: "Description détaillée"
+                    helper_text: "Minimum 15 caractères requis"
+                    mode: "rectangle"
+                    multiline: True
+                    min_height: "200dp"
+                    size_hint_y: None
+                    height: "200dp"
+
+                MDFillRoundFlatButton:
+                    text: "ENVOYER LE SIGNALEMENT"
+                    pos_hint: {"center_x": .5}
+                    size_hint_x: 0.9
+                    md_bg_color: (0.8, 0, 0, 1)
+                    on_release: root.envoyer_signalement()
