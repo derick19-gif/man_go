@@ -19,6 +19,7 @@
                 <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/stands" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Boutiques & Stands</a></li>
                 <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/services" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Prestataires de Services</a></li>
                 <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/register" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Devenir Vendeur</a></li>
+                <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/terms.php" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Conditions d'utilisation</a></li>
             </ul>
         </div>
 
@@ -29,7 +30,7 @@
                 <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/plans" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Forfaits & Abonnements</a></li>
                 <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/referral" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Programme de Parrainage</a></li>
                 <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/verification" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Certification KYC Vendeur</a></li>
-                <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/faq" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Centre d'aide & FAQ</a></li>
+                <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/faq.php" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Centre d'aide & FAQ</a></li>
             </ul>
         </div>
 

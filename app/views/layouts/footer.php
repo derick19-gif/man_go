@@ -21,8 +21,8 @@
             <div>
                 <h4 class="text-white font-bold mb-4 text-xs tracking-wider uppercase">Support</h4>
                 <ul class="space-y-2 text-xs">
-                    <li><a href="<?= $baseUrl ?>/faq" class="hover:text-amber-500 transition">Foire aux questions</a></li>
-                    <li><a href="<?= $baseUrl ?>/terms" class="hover:text-amber-500 transition">Conditions d'utilisation</a></li>
+                    <li><a href="<?= $baseUrl ?>/faq.php" class="hover:text-amber-500 transition">Foire aux questions</a></li>
+                    <li><a href="<?= $baseUrl ?>/terms.php" class="hover:text-amber-500 transition">Conditions d'utilisation</a></li>
                     <li><a href="<?= $baseUrl ?>/contact" class="hover:text-amber-500 transition">Nous contacter</a></li>
                 </ul>
             </div>
