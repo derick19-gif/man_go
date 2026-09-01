@@ -16,12 +16,12 @@ C:\xampp\htdocs\man_go\includes
 C:\xampp\htdocs\man_go\languages                           
 C:\xampp\htdocs\man_go\logs                                
 C:\xampp\htdocs\man_go\modules                             
-C:\xampp\htdocs\man_go\services                            
 C:\xampp\htdocs\man_go\storage                             
 C:\xampp\htdocs\man_go\themes                              
 C:\xampp\htdocs\man_go\uploads                             
 C:\xampp\htdocs\man_go\vendor                              
 C:\xampp\htdocs\man_go\vendor_dir                          
+C:\xampp\htdocs\man_go\_services_old                       
 C:\xampp\htdocs\man_go\.gitignore                          
 C:\xampp\htdocs\man_go\.htaccess                           
 C:\xampp\htdocs\man_go\arborescence.txt                    
@@ -29,6 +29,7 @@ C:\xampp\htdocs\man_go\bootstrap_test.php
 C:\xampp\htdocs\man_go\chat.php                            
 C:\xampp\htdocs\man_go\create_admin.php                    
 C:\xampp\htdocs\man_go\dashboard.php                       
+C:\xampp\htdocs\man_go\faq.php                             
 C:\xampp\htdocs\man_go\forgot-password.php                 
 C:\xampp\htdocs\man_go\index.php                           
 C:\xampp\htdocs\man_go\listing-detail.php                  
@@ -37,9 +38,11 @@ C:\xampp\htdocs\man_go\login.php
 C:\xampp\htdocs\man_go\logout.php                          
 C:\xampp\htdocs\man_go\orders.php                          
 C:\xampp\htdocs\man_go\product.php                         
+C:\xampp\htdocs\man_go\publish.php                         
 C:\xampp\htdocs\man_go\README.md                           
 C:\xampp\htdocs\man_go\register.php                        
 C:\xampp\htdocs\man_go\reset-password.php                  
+C:\xampp\htdocs\man_go\terms.php                           
 C:\xampp\htdocs\man_go\test.php                            
 C:\xampp\htdocs\man_go\test_controller.php                 
 C:\xampp\htdocs\man_go\test_http_login.php                 
@@ -58,7 +61,9 @@ C:\xampp\htdocs\man_go\api\orders.php
 C:\xampp\htdocs\man_go\api\vendor.php                      
 C:\xampp\htdocs\man_go\api\v1\controllers                  
 C:\xampp\htdocs\man_go\api\v1\middlewares                  
+C:\xampp\htdocs\man_go\api\v1\search                       
 C:\xampp\htdocs\man_go\api\v1\index.php                    
+C:\xampp\htdocs\man_go\api\v1\search\suggestions.php       
 C:\xampp\htdocs\man_go\app\controllers                     
 C:\xampp\htdocs\man_go\app\views                           
 C:\xampp\htdocs\man_go\app\controllers\HomeController.php  
@@ -124,7 +129,7 @@ C:\xampp\htdocs\man_go\modules\products
 C:\xampp\htdocs\man_go\modules\referral                    
 C:\xampp\htdocs\man_go\modules\reviews                     
 C:\xampp\htdocs\man_go\modules\search                      
-C:\xampp\htdocs\man_go\modules\services                    
+C:\xampp\htdocs\man_go\modules\service                     
 C:\xampp\htdocs\man_go\modules\stand                       
 C:\xampp\htdocs\man_go\modules\subscriptions               
 C:\xampp\htdocs\man_go\modules\users                       
@@ -171,9 +176,12 @@ C:\xampp\htdocs\man_go\modules\reviews\views
 C:\xampp\htdocs\man_go\modules\search\controllers          
 C:\xampp\htdocs\man_go\modules\search\models               
 C:\xampp\htdocs\man_go\modules\search\views                
-C:\xampp\htdocs\man_go\modules\services\controllers        
-C:\xampp\htdocs\man_go\modules\services\models             
-C:\xampp\htdocs\man_go\modules\services\views              
+C:\xampp\htdocs\man_go\modules\service\controllers         
+C:\xampp\htdocs\man_go\modules\service\models              
+C:\xampp\htdocs\man_go\modules\service\views               
+C:\xampp\htdocs\man_go\modules\service\controllers\Servi...
+C:\xampp\htdocs\man_go\modules\service\views\services      
+C:\xampp\htdocs\man_go\modules\service\views\services\in...
 C:\xampp\htdocs\man_go\modules\stand\controllers           
 C:\xampp\htdocs\man_go\modules\stand\models                
 C:\xampp\htdocs\man_go\modules\stand\views                 
@@ -186,10 +194,6 @@ C:\xampp\htdocs\man_go\modules\subscriptions\views
 C:\xampp\htdocs\man_go\modules\users\controllers           
 C:\xampp\htdocs\man_go\modules\users\models                
 C:\xampp\htdocs\man_go\modules\users\views                 
-C:\xampp\htdocs\man_go\services\cache                      
-C:\xampp\htdocs\man_go\services\queue                      
-C:\xampp\htdocs\man_go\services\search                     
-C:\xampp\htdocs\man_go\services\storage                    
 C:\xampp\htdocs\man_go\themes\default                      
 C:\xampp\htdocs\man_go\themes\default\assets               
 C:\xampp\htdocs\man_go\themes\default\templates            
@@ -211,5 +215,9 @@ C:\xampp\htdocs\man_go\uploads\stands
 C:\xampp\htdocs\man_go\uploads\users                       
 C:\xampp\htdocs\man_go\vendor_dir\dashboard.php            
 C:\xampp\htdocs\man_go\vendor_dir\settings.php             
+C:\xampp\htdocs\man_go\_services_old\cache                 
+C:\xampp\htdocs\man_go\_services_old\queue                 
+C:\xampp\htdocs\man_go\_services_old\search                
+C:\xampp\htdocs\man_go\_services_old\storage               
 
 

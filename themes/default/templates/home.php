@@ -107,22 +107,125 @@ $featuredStands = $featuredStands ?? [];
                 <?= htmlspecialchars(__t('hero_subtitle', [], $lang), ENT_QUOTES, 'UTF-8') ?>
             </p>
 
-            <!-- Recherche dynamique -->
-            <form action="/recherche" method="GET" class="flex flex-col sm:flex-row gap-2 max-w-2xl mx-auto bg-white/95 p-2 rounded-xl shadow-2xl backdrop-blur-md">
-                <input 
-                    type="text" 
-                    name="q" 
-                    placeholder="<?= htmlspecialchars(__t('search_placeholder', [], $lang), ENT_QUOTES, 'UTF-8') ?>" 
-                    required 
-                    class="flex-1 px-4 py-3 text-gray-800 rounded-lg focus:outline-none text-sm"
-                >
-                <button type="submit" class="bg-nature hover:bg-nature-dark text-white font-bold px-6 py-3 rounded-lg transition flex items-center justify-center gap-2 text-sm shadow">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                    <?= htmlspecialchars(__t('btn_search', [], $lang), ENT_QUOTES, 'UTF-8') ?>
-                </button>
-            </form>
+<!-- ========================================================================= -->
+<!-- NOUVEAU MOTEUR DE RECHERCHE FUTURISTE & AVANCÉ -->
+<!-- ========================================================================= -->
+<div class="relative max-w-5xl mx-auto pt-4" x-data="advancedSearch()">
+    <form action="/man_go/search" method="GET" class="bg-slate-900/95 backdrop-blur-xl p-3 sm:p-4 rounded-3xl shadow-2xl border border-slate-700/60 grid grid-cols-1 md:grid-cols-12 gap-3 items-center text-left">
+        
+        <!-- CHAMP 1 : RECHERCHE UNIVERSELLE (Mots-clés) -->
+        <div class="relative md:col-span-5">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-amber-500">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+            <input 
+                type="text" 
+                name="q" 
+                x-model="query"
+                @input.debounce.300ms="fetchSuggestions()"
+                @focus="showSuggestions = true"
+                placeholder="Que recherchez-vous aujourd'hui ?" 
+                class="w-full pl-12 pr-4 py-4 bg-slate-800/80 text-white placeholder-slate-400 text-sm rounded-2xl border border-slate-700 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all shadow-inner"
+                autocomplete="off"
+            >
+            
+            <!-- POPUP DE SUGGESTIONS DYNAMIQUES -->
+            <div x-show="showSuggestions && suggestions.length > 0" @click.away="showSuggestions = false" x-transition class="absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-50 divide-y divide-slate-800">
+                <template x-for="item in suggestions" :key="item.id">
+                    <a :href="item.url" class="flex items-center gap-3 px-4 py-3 hover:bg-slate-800/70 transition text-left group">
+                        <img :src="item.image || '/man_go/themes/default/assets/img/default.png'" class="w-10 h-10 rounded-xl object-cover border border-slate-700 group-hover:border-amber-500 transition">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-white truncate group-hover:text-amber-400 transition" x-text="item.title"></p>
+                            <p class="text-xs text-slate-400 capitalize" x-text="item.type + ' • ' + (item.category || '')"></p>
+                        </div>
+                        <span class="text-xs font-semibold px-2 py-1 bg-amber-500/10 text-amber-400 rounded-lg" x-text="item.price ? item.price + ' FCFA' : ''"></span>
+                    </a>
+                </template>
+            </div>
         </div>
-    </section>
+
+        <!-- CHAMP 2 : LOCALISATION UNIVERSELLE & RAYON -->
+        <div class="relative md:col-span-5">
+            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-amber-500">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            </div>
+            
+            <button 
+                type="button" 
+                @click="openGeoModal = !openGeoModal"
+                class="w-full pl-12 pr-10 py-4 bg-slate-800/80 text-left text-sm text-white rounded-2xl border border-slate-700 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all flex items-center justify-between shadow-inner truncate"
+            >
+                <span x-text="geoLabel || 'Pays, Région, Ville, Quartier...'" :class="geoLabel ? 'text-white' : 'text-slate-400'"></span>
+                <svg class="w-4 h-4 text-slate-400 transition-transform" :class="openGeoModal ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+
+            <!-- PANNEAU FLOTTANT GÉOGRAPHIQUE -->
+            <div x-show="openGeoModal" @click.away="openGeoModal = false" x-transition class="absolute left-0 right-0 mt-2 bg-slate-900 border border-slate-700 p-5 rounded-3xl shadow-2xl z-50 space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                    <h3 class="text-sm font-bold text-white uppercase tracking-wider">Localisation & Rayon d'action</h3>
+                    <button type="button" @click="openGeoModal = false" class="text-slate-400 hover:text-white">&times;</button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Pays</label>
+                        <select x-model="selectedCountry" class="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-amber-500 focus:outline-none">
+                            <option value="">Sélectionner un pays</option>
+                            <option value="TG">Togo</option>
+                            <option value="FR">France</option>
+                            <option value="CI">Côte d'Ivoire</option>
+                            <option value="SN">Sénégal</option>
+                            <option value="BE">Belgique</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Région / État / Province</label>
+                        <input type="text" x-model="selectedRegion" placeholder="Ex: Maritime, Île-de-France..." class="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-amber-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Ville / Commune</label>
+                        <input type="text" x-model="selectedCity" placeholder="Ex: Lomé, Paris..." class="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1">Quartier / District</label>
+                        <input type="text" x-model="selectedDistrict" placeholder="Ex: Adidogomé, Cocody..." class="w-full bg-slate-800 border border-slate-700 text-white text-xs rounded-xl p-2.5 focus:border-amber-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- CURSEUR DE RAYON -->
+                <div class="pt-2 border-t border-slate-800">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs font-medium text-slate-300">Rayon de recherche</label>
+                        <span class="text-xs font-bold text-amber-400" x-text="radius + ' km'"></span>
+                    </div>
+                    <input type="range" x-model="radius" min="0" max="500" step="5" class="w-full accent-amber-500 bg-slate-800 cursor-pointer">
+                </div>
+
+                <button type="button" @click="applyGeo()" class="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs uppercase tracking-wider rounded-xl transition shadow-lg shadow-amber-500/20">
+                    Appliquer la localisation
+                </button>
+            </div>
+
+            <!-- Champs cachés pour le formulaire -->
+            <input type="hidden" name="country" x-model="selectedCountry">
+            <input type="hidden" name="region" x-model="selectedRegion">
+            <input type="hidden" name="city" x-model="selectedCity">
+            <input type="hidden" name="district" x-model="selectedDistrict">
+            <input type="hidden" name="radius" x-model="radius">
+        </div>
+
+        <!-- BOUTON DE RECHERCHE -->
+        <div class="md:col-span-2">
+            <button type="submit" class="w-full py-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold text-sm rounded-2xl shadow-xl shadow-amber-500/20 transition-all flex items-center justify-center gap-2 transform active:scale-95">
+                <span>Rechercher</span>
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+            </button>
+        </div>
+    </form>
+</div>
 
     <!-- CATEGORIES COMPLTES (DEPUIS LA BDD) -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
@@ -130,7 +233,7 @@ $featuredStands = $featuredStands ?? [];
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
             <?php if (!empty($categories)): ?>
                 <?php foreach ($categories as $cat): ?>
-                    <a href="/annonces?category=<?= htmlspecialchars($cat['slug'], ENT_QUOTES, 'UTF-8') ?>" class="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 rounded-xl hover:border-mango hover:shadow-md transition group">
+                    <a href="/man_go/annonces?category=<?= htmlspecialchars($cat['slug'], ENT_QUOTES, 'UTF-8') ?>" class="flex flex-col items-center justify-center p-6 bg-white border border-gray-200 rounded-xl hover:border-mango hover:shadow-md transition group">
                         <div class="w-12 h-12 rounded-full bg-mango/10 text-mango flex items-center justify-center mb-3 group-hover:bg-mango group-hover:text-white transition">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
                         </div>
@@ -140,6 +243,48 @@ $featuredStands = $featuredStands ?? [];
             <?php endif; ?>
         </div>
     </section>
+
+<!-- Script Alpine.js pour gérer la logique de recherche -->
+<script>
+document.addEventListener('alpine:init', () => {
+    Alpine.data('advancedSearch', () => ({
+        query: '',
+        suggestions: [],
+        showSuggestions: false,
+        openGeoModal: false,
+        selectedCountry: '',
+        selectedRegion: '',
+        selectedCity: '',
+        selectedDistrict: '',
+        radius: 25,
+        geoLabel: '',
+
+        fetchSuggestions() {
+            if (this.query.length < 2) {
+                this.suggestions = [];
+                return;
+            }
+            fetch(`/man_go/api/v1/search/suggestions.php?q=${encodeURIComponent(this.query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    this.suggestions = data.results || [];
+                })
+                .catch(err => console.error('Erreur suggestions:', err));
+        },
+
+        applyGeo() {
+            let parts = [];
+            if (this.selectedDistrict) parts.push(this.selectedDistrict);
+            if (this.selectedCity) parts.push(this.selectedCity);
+            if (this.selectedRegion) parts.push(this.selectedRegion);
+            if (this.selectedCountry) parts.push(this.selectedCountry);
+            
+            this.geoLabel = parts.join(', ');
+            this.openGeoModal = false;
+        }
+    }));
+});
+</script>
 
     <!-- ANNONCES RCENTES (DEPUIS LA BDD) -->
     <section class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">

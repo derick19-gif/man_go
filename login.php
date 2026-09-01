@@ -139,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <form action="login.php" method="POST" class="space-y-4">
+            <form method="POST" action="" class="space-y-5">
                 
                 <!-- Email ou Téléphone -->
                 <div>

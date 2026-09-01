@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../../core/Session.php';
 require_once __DIR__ . '/../../../classes/Security.php';
 require_once __DIR__ . '/../../../core/Countries.php';
+require_once __DIR__ . '/../models/User.php';
 
 use App\Models\User;
 
@@ -13,12 +14,12 @@ use App\Models\User;
  */
 class AuthController extends Controller
 {
-        public function __construct(Request $request)
+    public function __construct(Request $request)
     {
         parent::__construct($request);
     }
 
-        /**
+    /**
      * Show login form
      * 
      * @return void
@@ -26,7 +27,7 @@ class AuthController extends Controller
     public function loginAction(): void
     {
         if (Session::isAuthenticated()) {
-            $this->redirect(APP_URL . '/dashboard');
+            $this->redirect(APP_URL . '/dashboard.php');
         }
 
         // Check for flash messages
@@ -47,10 +48,10 @@ class AuthController extends Controller
      * 
      * @return void
      */
-        public function registerAction(): void
+    public function registerAction(): void
     {
         if (Session::isAuthenticated()) {
-            $this->redirect(APP_URL . '/dashboard');
+            $this->redirect(APP_URL . '/dashboard.php');
         }
 
         echo $this->render('register', [
@@ -70,8 +71,8 @@ class AuthController extends Controller
             $this->redirect(APP_URL . '/register');
         }
 
-        // Verify CSRF token
-        $token = $this->request->post('_token');
+        // Verify CSRF token (flexible pour _token ou csrf_token)
+        $token = $this->request->post('_token') ?? $this->request->post('csrf_token');
         if (!Security::verifyCsrfToken($token)) {
             Session::flash('error', 'Token invalide.');
             $this->redirect(APP_URL . '/register');
@@ -88,11 +89,11 @@ class AuthController extends Controller
             $this->redirect(APP_URL . '/register');
         }
 
-        // TODO: Implémenter la logique d'enregistrement utilisateur ici
+        // TODO: ImplÃ©menter la logique d'enregistrement utilisateur ici
         // $userModel = new User();
         // $userModel->create(...);
 
-        Session::flash('message', 'Compte créé avec succès. Vous pouvez vous connecter.');
+        Session::flash('message', 'Compte crÃ©Ã© avec succÃ¨s. Vous pouvez vous connecter.');
         $this->redirect(APP_URL . '/login');
     }
 
@@ -107,8 +108,8 @@ class AuthController extends Controller
             $this->redirect(APP_URL . '/login');
         }
 
-        // Verify CSRF token
-        $token = $this->request->post('_token');
+        // Verify CSRF token (flexible pour _token ou csrf_token)
+        $token = $this->request->post('_token') ?? $this->request->post('csrf_token');
         if (!Security::verifyCsrfToken($token)) {
             Security::logSecurityEvent('CSRF_FAILED', ['ip' => $this->request->getIp()]);
             Session::flash('error', 'Session expired or invalid token. Please try again.');
@@ -133,25 +134,35 @@ class AuthController extends Controller
         $email    = trim($this->request->post('email', ''));
         $password = $this->request->post('password', '');
 
-        // Validate input
+        // Validate input (Email or Phone)
         if (empty($email) || empty($password)) {
             Security::logSecurityEvent('LOGIN_EMPTY_CREDENTIALS', ['email' => $email, 'ip' => $this->request->getIp()]);
-            Session::flash('error', 'Please enter your email and password.');
+            Session::flash('error', 'Please enter your email/phone and password.');
             $this->redirect(APP_URL . '/login');
         }
 
-        if (!Security::validateEmail($email)) {
-            Security::logSecurityEvent('LOGIN_INVALID_EMAIL', ['email' => $email, 'ip' => $this->request->getIp()]);
-            Session::flash('error', 'Invalid email address.');
+        // VÃ©rifier si c'est un email ou un numÃ©ro de tÃ©lÃ©phone
+        $isEmail = filter_var($email, FILTER_VALIDATE_EMAIL);
+        $isPhone = preg_match('/^[0-9+\s\-]{8,15}$/', $email);
+
+        if (!$isEmail && !$isPhone) {
+            Security::logSecurityEvent('LOGIN_INVALID_IDENTIFIER', ['email' => $email, 'ip' => $this->request->getIp()]);
+            Session::flash('error', 'Invalid email address or phone number.');
             $this->redirect(APP_URL . '/login');
         }
 
         // Find user
         $userModel = new User();
-        $user = $userModel->findByEmail($email);
+        $user = method_exists($userModel, 'findByEmailOrPhone') 
+            ? $userModel->findByEmailOrPhone($email) 
+            : $userModel->findByEmail($email);
 
         if (!$user || !$user->exists()) {
-            Security::logSecurityEvent('LOGIN_USER_NOT_FOUND', ['email' => $email, 'ip' => $this->request->getIp()]);
+            Security::logSecurityEvent('LOGIN_USER_NOT_FOUND', [
+                'email' => $email,
+                'ip'    => $this->request->getIp(),
+            ]);
+
             Session::flash('error', 'Invalid credentials. Please try again.');
             $this->redirect(APP_URL . '/login');
         }
@@ -211,7 +222,7 @@ class AuthController extends Controller
             apcu_delete('ratelimit:' . $rateLimitKey);
         }
 
-        // Redirection par rle ou URL de redirection explicite
+        // Redirection par rÃ´le ou URL de redirection explicite
         $redirectUrl = $this->request->post('redirect') ?: $this->request->query('redirect');
 
         if (!$redirectUrl) {
@@ -220,7 +231,7 @@ class AuthController extends Controller
             } elseif (in_array('vendor', $roles, true)) {
                 $redirectUrl = APP_URL . '/vendor/dashboard';
             } else {
-                $redirectUrl = APP_URL . '/';
+                $redirectUrl = APP_URL . '/dashboard.php';
             }
         }
 

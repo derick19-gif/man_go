@@ -44,6 +44,9 @@ $router->get('/login', 'AuthController@loginAction');
 $router->post('/login', 'AuthController@authenticateAction');
 $router->get('/register', 'AuthController@registerAction');
 $router->get('/logout', 'AuthController@logoutAction');
+// Routes pour le module KYC
+$router->get('/kyc', 'Modules\Kyc\Controllers\KycController@index');
+$router->post('/kyc/submit', 'Modules\Kyc\Controllers\KycController@submit');
 
 // --- LANCEMENT DU ROUTEUR ---
 try {

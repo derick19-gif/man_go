@@ -18,6 +18,7 @@ define('APP_NAME', 'MAN GO Marketplace');
 define('APP_VERSION', '1.0.0');
 define('DEFAULT_LANG', 'fr');
 define('APP_DEBUG', true); // Mettre  false en production
+define('CSRF_TOKEN_LIFETIME', 3600);
 
 if (!defined('APP_PATH')) {
     define('APP_PATH', dirname(__DIR__));

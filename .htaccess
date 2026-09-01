@@ -1,4 +1,9 @@
 RewriteEngine On
+RewriteBase /man_go/
+
+# Si le fichier ou le dossier existe, on le laisse tranquille
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^(.*)$ index.php?path=$1 [QSA,L]
+
+# Sinon, on redirige tout vers index.php
+RewriteRule ^(.*)$ index.php [L,QSA]

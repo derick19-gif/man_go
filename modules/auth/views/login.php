@@ -30,7 +30,7 @@
         <?php endif; ?>
 
         <!-- Form -->
-        <form method="POST" action="<?php echo defined('APP_URL') ? APP_URL : ''; ?>/authenticate" class="space-y-5">
+        <form method="POST" action="<?php echo defined('APP_URL') ? APP_URL : ''; ?>/login" class="space-y-5">
             <input type="hidden" name="_token" value="<?php echo htmlspecialchars($csrf_token ?? ''); ?>">
             
             <div class="relative">
@@ -51,7 +51,11 @@
                         <i class="fa-solid fa-lock"></i>
                     </div>
                     <input type="password" id="password" name="password" required placeholder="••••••••"
-                           class="block w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition">
+                           class="block w-full pl-10 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition">
+                    <!-- Bouton Œil pour afficher/masquer -->
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer" onclick="togglePassword()">
+                        <i id="toggleIcon" class="fa-solid fa-eye text-gray-400 hover:text-gray-600"></i>
+                    </div>
                 </div>
             </div>
 
@@ -68,5 +72,22 @@
             </p>
         </div>
     </div>
+
+    <!-- Script pour le bouton Œil -->
+    <script>
+    function togglePassword() {
+        const passwordInput = document.getElementById('password');
+        const icon = document.getElementById('toggleIcon');
+        if (passwordInput.type === 'password') {
+            passwordInput.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            passwordInput.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+    </script>
 </body>
 </html>

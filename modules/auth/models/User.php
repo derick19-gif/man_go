@@ -6,11 +6,9 @@ use Security;
 
 /**
  * User Model
-
  * 
  * Handles user data and database operations
  */
-
 class User
 {
     /**
@@ -44,11 +42,12 @@ class User
     public function findByEmail(string $email): ?self
     {
         $stmt = $this->db->prepare("
-            SELECT u.*, GROUP_CONCAT(r.slug) as roles
+            SELECT u.*, GROUP_CONCAT(r.name) as roles
             FROM users u
             LEFT JOIN user_roles ur ON u.id = ur.user_id
             LEFT JOIN roles r ON ur.role_id = r.id
-            WHERE u.email = :email AND u.deleted_at IS NULL
+            WHERE u.email = :email
+            GROUP BY u.id
             LIMIT 1
         ");
 
@@ -72,15 +71,48 @@ class User
     public function findByPhone(string $phone): ?self
     {
         $stmt = $this->db->prepare("
-            SELECT u.*, GROUP_CONCAT(r.slug) as roles
+            SELECT u.*, GROUP_CONCAT(r.name) as roles
             FROM users u
             LEFT JOIN user_roles ur ON u.id = ur.user_id
             LEFT JOIN roles r ON ur.role_id = r.id
-            WHERE u.phone = :phone AND u.deleted_at IS NULL
+            WHERE u.phone = :phone
+            GROUP BY u.id
             LIMIT 1
         ");
 
         $stmt->execute([':phone' => $phone]);
+        $result = $stmt->fetch();
+
+        if (!$result) {
+            return null;
+        }
+
+        $this->data = $result;
+        return $this;
+    }
+
+    /**
+     * Find user by email or phone identifier
+     * 
+     * @param string $identifier
+     * @return self|null
+     */
+    public function findByEmailOrPhone(string $identifier): ?self
+    {
+        $stmt = $this->db->prepare("
+            SELECT u.*, GROUP_CONCAT(r.name) as roles
+            FROM users u
+            LEFT JOIN user_roles ur ON u.id = ur.user_id
+            LEFT JOIN roles r ON ur.role_id = r.id
+            WHERE (u.email = :email_id OR u.phone = :phone_id)
+            GROUP BY u.id
+            LIMIT 1
+        ");
+
+        $stmt->execute([
+            ':email_id' => $identifier,
+            ':phone_id' => $identifier
+        ]);
         $result = $stmt->fetch();
 
         if (!$result) {
@@ -100,11 +132,11 @@ class User
     public function findById(int $id): ?self
     {
         $stmt = $this->db->prepare("
-            SELECT u.*, GROUP_CONCAT(r.slug) as roles
+            SELECT u.*, GROUP_CONCAT(r.name) as roles
             FROM users u
             LEFT JOIN user_roles ur ON u.id = ur.user_id
             LEFT JOIN roles r ON ur.role_id = r.id
-            WHERE u.id = :id AND u.deleted_at IS NULL
+            WHERE u.id = :id
             GROUP BY u.id
             LIMIT 1
         ");
@@ -133,11 +165,11 @@ class User
 
             $stmt = $this->db->prepare("
                 INSERT INTO users (
-                    uuid, first_name, last_name, email, password, phone,
+                    uuid, first_name, last_name, email, password_hash, phone,
                     country_id, locale_id, currency_id, timezone_id,
                     is_active, is_verified, created_at, updated_at
                 ) VALUES (
-                    UUID(), :first_name, :last_name, :email, :password, :phone,
+                    UUID(), :first_name, :last_name, :email, :password_hash, :phone,
                     :country_id, :locale_id, :currency_id, :timezone_id,
                     :is_active, :is_verified, NOW(), NOW()
                 )
@@ -147,7 +179,7 @@ class User
                 ':first_name' => $data['first_name'] ?? null,
                 ':last_name' => $data['last_name'] ?? null,
                 ':email' => $data['email'],
-                ':password' => Security::hashPassword($data['password']),
+                ':password_hash' => Security::hashPassword($data['password_hash']),
                 ':phone' => $data['phone'] ?? null,
                 ':country_id' => $data['country_id'] ?? null,
                 ':locale_id' => $data['locale_id'] ?? null,
@@ -217,25 +249,25 @@ class User
     }
 
     /**
-     * Update password
+     * Update password_hash
      * 
-     * @param string $password
+     * @param string $password_hash
      * @return bool
      */
-    public function updatePassword(string $password): bool
+    public function updatePassword(string $password_hash): bool
     {
         if (empty($this->data['id'])) {
-            throw new \RuntimeException('Cannot update password without user ID');
+            throw new \RuntimeException('Cannot update password_hash without user ID');
         }
 
         $stmt = $this->db->prepare("
             UPDATE users
-            SET password = :password, updated_at = NOW()
+            SET password_hash = :password_hash, updated_at = NOW()
             WHERE id = :id
         ");
 
         return $stmt->execute([
-            ':password' => Security::hashPassword($password),
+            ':password_hash' => Security::hashPassword($password_hash),
             ':id' => $this->data['id'],
         ]);
     }
@@ -261,23 +293,23 @@ class User
     }
 
     /**
-     * Verify password
+     * Verify password_hash
      * 
-     * @param string $password
+     * @param string $password_hash
      * @return bool
      */
-    public function verifyPassword(string $password): bool
+    public function verifyPassword(string $password_hash): bool
     {
-        if (empty($this->data['password'])) {
+        if (empty($this->data['password_hash'])) {
             return false;
         }
 
-        // Check if password needs rehashing
-        if (Security::needsRehash($this->data['password'])) {
-            $this->updatePassword($password);
+        // Check if password_hash needs rehashing
+        if (Security::needsRehash($this->data['password_hash'])) {
+            $this->updatePassword($password_hash);
         }
 
-        return Security::verifyPassword($password, $this->data['password']);
+        return Security::verifyPassword($password_hash, $this->data['password_hash']);
     }
 
     /**
