@@ -254,11 +254,11 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
             <!-- Sidebar Navigation -->
             <nav class="col-md-3 col-lg-2 d-md-block bg-white sidebar p-3 border-end">
                 <div class="d-flex align-items-center mb-4 ps-2 p-2 rounded-3 bg-light border border-opacity-50">
-                    <img src="<?= htmlspecialchars($user['avatar'] ?? 'assets/images/default-avatar.png', ENT_QUOTES, 'UTF-8') ?>" 
+                    <img src="<?= htmlspecialchars(($user ?? [])['avatar'] ?? 'assets/images/default-avatar.png', ENT_QUOTES, 'UTF-8') ?>" 
                          alt="Avatar" class="rounded-circle me-2 border border-2 border-white shadow-sm" width="45" height="45" style="object-fit: cover;">
                     <div class="text-truncate">
-                        <strong class="d-block text-truncate text-dark"><?= htmlspecialchars($user['name'] ?? 'Utilisateur', ENT_QUOTES, 'UTF-8') ?></strong>
-                        <small class="text-muted d-block text-truncate" style="font-size: 0.75rem;"><?= htmlspecialchars($user['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
+                        <strong class="d-block text-truncate text-dark"><?= htmlspecialchars(($user ?? [])['name'] ?? 'Utilisateur', ENT_QUOTES, 'UTF-8') ?></strong>
+                        <small class="text-muted d-block text-truncate" style="font-size: 0.75rem;"><?= htmlspecialchars(($user ?? [])['email'] ?? '', ENT_QUOTES, 'UTF-8') ?></small>
                     </div>
                 </div>
 

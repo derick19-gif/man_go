@@ -106,7 +106,7 @@ $userAvatar = $_SESSION['user']['avatar'] ?? (class_exists('Session') ? Session:
                 <div class="flex items-center space-x-3 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-full shadow-inner">
                     <img src="<?= htmlspecialchars($userAvatar ?? 'assets/images/default-avatar.png', ENT_QUOTES, 'UTF-8') ?>" alt="Avatar" class="w-7 h-7 rounded-full object-cover border border-amber-500/50">
                     <a href="<?= $baseUrl ?>/dashboard" class="text-xs font-bold text-white hover:text-amber-400 transition truncate max-w-[120px]">
-                        <?= htmlspecialchars($userName, ENT_QUOTES, 'UTF-8') ?>
+                       <?= htmlspecialchars($userName ?? '', ENT_QUOTES, 'UTF-8') ?>
                     </a>
                 </div>
                 <a href="<?= $baseUrl ?>/logout" class="text-xs font-bold text-red-400 hover:text-red-300 p-2 rounded-lg hover:bg-red-500/10 transition" title="Déconnexion">
