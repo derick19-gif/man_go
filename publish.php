@@ -3,9 +3,54 @@
 // Page de Publication - MAN GO Marketplace (Annonces, Boutiques & Services Web)
 // =========================================================================
 
+// 1. DÉFINITION DE LA CONSTANTE MANQUANTE ICI AUSSI
+if (!defined('APP_PATH')) {
+    define('APP_PATH', __DIR__);
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
+$baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
+
+// 2. Redirection vers la connexion si l'utilisateur n'est pas connecté
+if (empty($_SESSION['user_id'])) {
+    header("Location: $baseUrl/login.php?redirect=publish.php");
+    exit();
+}
+
+// 3. Inclusions obligatoires pour lier le Module KYC
+require_once __DIR__ . '/modules/kyc/Models/KycModel.php';
+require_once __DIR__ . '/modules/kyc/Controllers/KycController.php';
+
+// 4. Vérification stricte du KYC (Appel du contrôleur)
+if (!\Modules\Kyc\Controllers\KycController::checkAccess()) {
+    // Si l'utilisateur n'est pas approuvé, on le redirige vers le formulaire KYC
+    header("Location: $baseUrl/verification.php");
+    exit();
+}
+
+// Traitement du formulaire à la soumission
+$successMessage = "";
+$errorMessage = "";
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $title = trim($_POST['title'] ?? '');
+    $category = trim($_POST['category'] ?? '');
+    $price = trim($_POST['price'] ?? '');
+    $description = trim($_POST['description'] ?? '');
+    $webLink = trim($_POST['web_link'] ?? '');
+
+    if (empty($title) || empty($category) || empty($description)) {
+        $errorMessage = "Veuillez remplir tous les champs obligatoires.";
+    } else {
+        // Logique d'enregistrement en base de données à insérer ici
+        $successMessage = "Votre publication a été mise en ligne avec succès !";
+    }
+}
+?>
+
 $_SESSION['user_id'] = 1;
 $_SESSION['kyc_status'] = 'verified';
 

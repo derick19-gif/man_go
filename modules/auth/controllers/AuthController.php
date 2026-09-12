@@ -1,11 +1,20 @@
 <?php
 
-require_once __DIR__ . '/../../../core/Session.php';
-require_once __DIR__ . '/../../../classes/Security.php';
-require_once __DIR__ . '/../../../core/Countries.php';
-require_once __DIR__ . '/../models/User.php';
+namespace App\Modules\Auth\Controllers;
 
-use App\Models\User;
+// 1. L'ARME ABSOLUE : On force PHP à charger les classes que l'Autoloader ignore
+require_once __DIR__ . '/../../../classes/Security.php';
+require_once __DIR__ . '/../../../core/Countries.php'; // Par précaution
+
+// 2. Les classes MVC modernes
+use App\Core\Controller;
+use App\Core\Request;
+use App\Modules\Auth\Models\User;
+
+// 3. Les classes globales
+use Session;
+use Countries;
+use Security;
 
 /**
  * Authentication Controller
@@ -14,16 +23,12 @@ use App\Models\User;
  */
 class AuthController extends Controller
 {
+    
     public function __construct(Request $request)
     {
         parent::__construct($request);
     }
 
-    /**
-     * Show login form
-     * 
-     * @return void
-     */
     public function loginAction(): void
     {
         if (Session::isAuthenticated()) {
@@ -43,11 +48,6 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Show register form
-     * 
-     * @return void
-     */
     public function registerAction(): void
     {
         if (Session::isAuthenticated()) {
@@ -60,18 +60,13 @@ class AuthController extends Controller
         ]);
     }
 
-    /**
-     * Process registration
-     * 
-     * @return void
-     */
     public function registerProcessAction(): void
     {
         if (!$this->request->isPost()) {
             $this->redirect(APP_URL . '/register');
         }
 
-        // Verify CSRF token (flexible pour _token ou csrf_token)
+        // Verify CSRF token
         $token = $this->request->post('_token') ?? $this->request->post('csrf_token');
         if (!Security::verifyCsrfToken($token)) {
             Session::flash('error', 'Token invalide.');
@@ -89,26 +84,17 @@ class AuthController extends Controller
             $this->redirect(APP_URL . '/register');
         }
 
-        // TODO: ImplÃ©menter la logique d'enregistrement utilisateur ici
-        // $userModel = new User();
-        // $userModel->create(...);
-
-        Session::flash('message', 'Compte crÃ©Ã© avec succÃ¨s. Vous pouvez vous connecter.');
+        Session::flash('message', 'Compte créé avec succès. Vous pouvez vous connecter.');
         $this->redirect(APP_URL . '/login');
     }
 
-    /**
-     * Process login
-     * 
-     * @return void
-     */
     public function authenticateAction(): void
     {
         if (!$this->request->isPost()) {
             $this->redirect(APP_URL . '/login');
         }
 
-        // Verify CSRF token (flexible pour _token ou csrf_token)
+        // Verify CSRF token
         $token = $this->request->post('_token') ?? $this->request->post('csrf_token');
         if (!Security::verifyCsrfToken($token)) {
             Security::logSecurityEvent('CSRF_FAILED', ['ip' => $this->request->getIp()]);
@@ -134,14 +120,12 @@ class AuthController extends Controller
         $email    = trim($this->request->post('email', ''));
         $password = $this->request->post('password', '');
 
-        // Validate input (Email or Phone)
         if (empty($email) || empty($password)) {
             Security::logSecurityEvent('LOGIN_EMPTY_CREDENTIALS', ['email' => $email, 'ip' => $this->request->getIp()]);
             Session::flash('error', 'Please enter your email/phone and password.');
             $this->redirect(APP_URL . '/login');
         }
 
-        // VÃ©rifier si c'est un email ou un numÃ©ro de tÃ©lÃ©phone
         $isEmail = filter_var($email, FILTER_VALIDATE_EMAIL);
         $isPhone = preg_match('/^[0-9+\s\-]{8,15}$/', $email);
 
@@ -217,12 +201,10 @@ class AuthController extends Controller
             'ip'      => $this->request->getIp(),
         ]);
 
-        // Clear rate limit on success
         if (function_exists('apcu_delete')) {
             apcu_delete('ratelimit:' . $rateLimitKey);
         }
 
-        // Redirection par rÃ´le ou URL de redirection explicite
         $redirectUrl = $this->request->post('redirect') ?: $this->request->query('redirect');
 
         if (!$redirectUrl) {
@@ -238,11 +220,6 @@ class AuthController extends Controller
         $this->redirect($redirectUrl);
     }
 
-    /**
-     * Logout
-     * 
-     * @return void
-     */
     public function logoutAction(): void
     {
         $userId = Session::getUserId();
@@ -260,11 +237,6 @@ class AuthController extends Controller
         $this->redirect(APP_URL . '/login');
     }
 
-    /**
-     * Check if user is authenticated (AJAX)
-     * 
-     * @return void
-     */
     public function checkAction(): void
     {
         if (!$this->request->isAjax()) {

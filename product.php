@@ -2,7 +2,7 @@
 require_once 'config/config.php';
 require_once 'core/Session.php';
 
-use App\Core\Session;
+use Session;
 
 $product_id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $current_user_id = Session::isAuthenticated() ? Session::getUserId() : 0;

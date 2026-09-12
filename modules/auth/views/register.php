@@ -23,15 +23,24 @@
 
     <!-- Conteneur Formulaire -->
     <main class="flex-grow flex items-center justify-center p-4">
-        <div class="w-full max-w-md p-8 bg-white rounded-3xl shadow-xl border border-gray-100">
-            <div class="text-center mb-8">
-                <div class="bg-amber-500 text-slate-900 font-black text-3xl w-16 h-16 rounded-full flex items-center justify-center shadow-lg mx-auto mb-4">M</div>
-                <h2 class="text-2xl font-bold text-gray-900">Inscription</h2>
-                <p class="text-gray-500 text-sm mt-2">Rejoignez <?php echo htmlspecialchars(defined('APP_NAME') ? APP_NAME : 'MAN GO'); ?></p>
+        <div class="w-full max-w-lg p-8 bg-white rounded-3xl shadow-xl border border-gray-100 my-6">
+            <div class="text-center mb-6">
+                <div class="bg-amber-500 text-slate-900 font-black text-3xl w-16 h-16 rounded-full flex items-center justify-center shadow-lg mx-auto mb-3">M</div>
+                <h2 class="text-2xl font-bold text-gray-900">Créer un compte</h2>
+                <p class="text-gray-500 text-sm mt-1">Rejoignez <?php echo htmlspecialchars(defined('APP_NAME') ? APP_NAME : 'MAN GO'); ?></p>
             </div>
 
             <form method="POST" action="<?php echo defined('APP_URL') ? APP_URL : '/man_go'; ?>/register.php" class="space-y-4">
                 <input type="hidden" name="_token" value="<?php echo htmlspecialchars($csrf_token ?? ''); ?>">
+
+                <!-- Type de compte -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Je souhaite m'inscrire en tant que :</label>
+                    <select name="role" class="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition">
+                        <option value="buyer">Acheteur (Recherche de biens / services)</option>
+                        <option value="vendor">Vendeur / Propriétaire de stand</option>
+                    </select>
+                </div>
 
                 <!-- Nom -->
                 <div>
@@ -67,7 +76,22 @@
                     <label class="block text-sm font-semibold text-gray-700 mb-1">Mot de passe</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i class="fa-solid fa-lock"></i></div>
-                        <input type="password" name="password" placeholder="Votre mot de passe" required class="block w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition">
+                        <input type="password" id="password" name="password" placeholder="Votre mot de passe" required class="block w-full pl-10 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition">
+                        <button type="button" onclick="togglePassword('password', 'eye-password')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none">
+                            <i id="eye-password" class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Confirmation du mot de passe -->
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Confirmer le mot de passe</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400"><i class="fa-solid fa-lock"></i></div>
+                        <input type="password" id="password_confirm" name="password_confirm" placeholder="Confirmez le mot de passe" required class="block w-full pl-10 pr-12 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition">
+                        <button type="button" onclick="togglePassword('password_confirm', 'eye-password-confirm')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none">
+                            <i id="eye-password-confirm" class="fa-solid fa-eye"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -87,5 +111,22 @@
         &copy; <?php echo date('Y'); ?> MAN GO Marketplace. Tous droits réservés.
     </footer>
 
+    <!-- Script pour afficher / masquer les mots de passe -->
+    <script>
+        function togglePassword(fieldId, iconId) {
+            const passwordField = document.getElementById(fieldId);
+            const eyeIcon = document.getElementById(iconId);
+            
+            if (passwordField.type === "password") {
+                passwordField.type = "text";
+                eyeIcon.classList.remove("fa-eye");
+                eyeIcon.classList.add("fa-eye-slash");
+            } else {
+                passwordField.type = "password";
+                eyeIcon.classList.remove("fa-eye-slash");
+                eyeIcon.classList.add("fa-eye");
+            }
+        }
+    </script>
 </body>
 </html>

@@ -2,7 +2,7 @@
 require_once 'config/config.php';
 require_once 'core/Session.php';
 
-use App\Core\Session;
+use Session;
 
 if (!Session::isAuthenticated()) {
     header('Location: login.php');

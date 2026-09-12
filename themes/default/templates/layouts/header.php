@@ -1,25 +1,38 @@
 <?php
-// header.php
+// =========================================================================
+// HEADER.PHP (Thème par défaut) - Version Startup & Robuste
+// =========================================================================
 
-// Sécurisation et initialisation de la session si ce n'est pas déjà fait
+// 1. Sécurisation et initialisation de la session native
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// Détermination propre de l'URL de base
+// 2. Détermination propre de l'URL de base
 $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
 
-// Vérification de l'état de connexion (gère à la fois $_SESSION['user'] et Session::get('user_id') pour une compatibilité maximale)
-$isLoggedIn = isset($_SESSION['user']) || (class_exists('Session') && Session::get('user_id'));
-$userName = $_SESSION['user']['name'] ?? (class_exists('Session') ? Session::get('user_name') : 'Mon Compte');
-$userAvatar = $_SESSION['user']['avatar'] ?? (class_exists('Session') ? Session::get('user_avatar') : null);
+// 3. INITIALISATION FORCÉE DE LA CLASSE SESSION (Le secret pour que ça marche)
+if (class_exists('Session') && method_exists('Session', 'init')) {
+    Session::init();
+}
+
+// 4. Vérification ultra-robuste de l'état de connexion
+$isLoggedIn = isset($_SESSION['user_id']) || isset($_SESSION['user']) || (class_exists('Session') && Session::isAuthenticated());
+
+// 5. Récupération sécurisée des informations de l'utilisateur
+$userName = $_SESSION['user_name'] ?? $_SESSION['user']['name'] ?? (class_exists('Session') ? Session::get('user_name') : 'Mon Compte');
+$userRole = $_SESSION['user_role'] ?? $_SESSION['user']['role'] ?? (class_exists('Session') ? Session::get('user_role') : '');
+$userAvatar = $_SESSION['user_avatar'] ?? $_SESSION['user']['avatar'] ?? (class_exists('Session') ? Session::get('user_avatar') : null);
+
+// 6. Routage intelligent : On envoie le vendeur vers son espace Pro, et le client vers son espace client
+$dashboardLink = ($userRole === 'vendor') ? $baseUrl . '/vendor_dir/dashboard.php' : $baseUrl . '/client/views/dashboard.php';
 ?>
 <!DOCTYPE html>
-<html lang="<?= htmlspecialchars($lang ?? 'fr', ENT_QUOTES, 'UTF-8') ?>" class="h-full">
+<html lang="fr" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= isset($pageTitle) ? htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') : 'MAN GO - Marketplace Universelle'; ?></title>
+    <title><?= isset($pageTitle) ? htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') : 'MAN GO - One Market, One Movement.'; ?></title>
     
     <!-- Tailwind CSS v3 CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -29,27 +42,25 @@ $userAvatar = $_SESSION['user']['avatar'] ?? (class_exists('Session') ? Session:
                 extend: {
                     colors: {
                         brand: {
-                            50: '#fffbeb',
-                            500: '#f59e0b',
+                            500: '#f59e0b', // Amber 500
                             600: '#d97706',
-                            950: '#090d16',
+                            950: '#090d16', // Dark
                         }
                     },
                     fontFamily: {
-                        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+                        sans: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
                     },
                     boxShadow: {
-                        'futuristic': '0 10px 30px -10px rgba(245, 158, 11, 0.2)',
-                        'glow': '0 0 20px rgba(245, 158, 11, 0.4)',
+                        'futuristic': '0 10px 30px -10px rgba(245, 158, 11, 0.3)',
+                        'glow': '0 0 20px rgba(245, 158, 11, 0.5)',
                     }
                 }
             }
         }
     </script>
     
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- FontAwesome Pro/Free Icons -->
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <style>
@@ -81,14 +92,15 @@ $userAvatar = $_SESSION['user']['avatar'] ?? (class_exists('Session') ? Session:
 <header class="glass-header border-b border-slate-800/80 sticky top-0 z-50 transition-all duration-300">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         
-        <!-- Logo Brand -->
+        <!-- Logo Brand & SLOGAN -->
         <a href="<?= $baseUrl ?>/" class="flex items-center space-x-3 text-white group focus:outline-none">
             <div class="bg-gradient-to-tr from-amber-600 to-amber-400 text-slate-950 font-black text-xl w-11 h-11 rounded-2xl flex items-center justify-center shadow-futuristic group-hover:scale-105 transition transform duration-300">
                 M
             </div>
             <div class="flex flex-col">
                 <span class="font-extrabold text-xl tracking-tight leading-none">MAN <span class="text-amber-500">GO</span></span>
-                <span class="text-[0.65rem] tracking-widest text-slate-400 font-semibold uppercase mt-0.5">Marketplace</span>
+                <!-- Le fameux Slogan intégré subtilement -->
+                <span class="text-[0.65rem] tracking-wider text-amber-500/90 font-bold uppercase mt-0.5">One Market, One Movement.</span>
             </div>
         </a>
         
@@ -102,31 +114,31 @@ $userAvatar = $_SESSION['user']['avatar'] ?? (class_exists('Session') ? Session:
 
         <!-- Actions / Espace Utilisateur Desktop -->
         <div class="hidden md:flex items-center space-x-4">
+            
             <?php if ($isLoggedIn): ?>
-                <div class="flex items-center space-x-3 bg-slate-900/90 border border-slate-800 px-3 py-1.5 rounded-full shadow-inner">
-                    <img src="<?= htmlspecialchars($userAvatar ?? 'assets/images/default-avatar.png', ENT_QUOTES, 'UTF-8') ?>" alt="Avatar" class="w-7 h-7 rounded-full object-cover border border-amber-500/50">
-                    <a href="<?= $baseUrl ?>/dashboard" class="text-xs font-bold text-white hover:text-amber-400 transition truncate max-w-[120px]">
-                       <?= htmlspecialchars($userName ?? '', ENT_QUOTES, 'UTF-8') ?>
-                    </a>
-                </div>
-                <a href="<?= $baseUrl ?>/logout" class="text-xs font-bold text-red-400 hover:text-red-300 p-2 rounded-lg hover:bg-red-500/10 transition" title="Déconnexion">
+                <!-- Interface pour utilisateur CONNECTÉ -->
+                <a href="<?= $dashboardLink ?>" class="text-sm font-bold text-slate-200 hover:text-amber-400 transition flex items-center space-x-2 bg-slate-800/50 px-4 py-2 rounded-full border border-slate-700/50">
+                    <i class="fa-solid <?= ($userRole === 'vendor') ? 'fa-store' : 'fa-user' ?> text-amber-500"></i>
+                    <span><?= ($userRole === 'vendor') ? 'Espace Pro' : 'Mon Compte' ?></span>
+                </a>
+                <a href="<?= $baseUrl ?>/logout.php" class="text-xs font-bold text-red-400 hover:text-red-300 p-2.5 rounded-full hover:bg-red-500/10 transition" title="Déconnexion">
                     <i class="fa-solid fa-power-off text-sm"></i>
                 </a>
             <?php else: ?>
-                <a href="<?= $baseUrl ?>/login.php" class="text-xs font-bold text-slate-300 hover:text-amber-400 px-3 py-2 transition">Connexion</a>
-                <a href="<?= $baseUrl ?>/register" class="text-xs font-bold text-amber-400 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 rounded-full transition shadow-sm">Inscription</a>
+                <!-- Interface pour utilisateur DÉCONNECTÉ -->
+                <a href="<?= $baseUrl ?>/login.php" class="text-sm font-bold text-slate-300 hover:text-amber-400 px-3 py-2 transition">Connexion</a>
+                <a href="<?= $baseUrl ?>/register.php" class="text-sm font-bold text-amber-400 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-5 py-2.5 rounded-full transition shadow-sm">Inscription</a>
             <?php endif; ?>
 
-            <!-- Bouton Publication Futuriste -->
-            <a href="<?= $baseUrl ?>/publish" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold px-5 py-2.5 rounded-full text-xs transition-all duration-300 shadow-futuristic hover:shadow-glow flex items-center space-x-2 transform hover:-translate-y-0.5">
-                <i class="fa-solid fa-plus-circle text-sm"></i>
-                <span>Publier une annonce</span>
+            <!-- L'UNIQUE BOUTON PUBLIER -->
+            <a href="<?= $baseUrl ?>/publish.php" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold px-5 py-2.5 rounded-full text-sm transition-all duration-300 shadow-futuristic hover:shadow-glow flex items-center space-x-2 transform hover:-translate-y-0.5">
+                <i class="fa-solid fa-plus-circle"></i><span>Publier</span>
             </a>
         </div>
 
         <!-- Bouton Menu Mobile Toggle -->
         <div class="flex md:hidden items-center space-x-3">
-            <a href="<?= $baseUrl ?>/publish" class="bg-amber-500 text-slate-950 font-bold p-2.5 rounded-full text-xs shadow-md">
+            <a href="<?= $isLoggedIn ? $dashboardLink . '#tab-publish' : $baseUrl . '/login.php' ?>" class="bg-amber-500 text-slate-950 font-bold p-2.5 rounded-full text-xs shadow-md">
                 <i class="fa-solid fa-plus"></i>
             </a>
             <button id="mobile-menu-button" type="button" class="text-slate-300 hover:text-white focus:outline-none p-2 rounded-lg bg-slate-900 border border-slate-800">
@@ -146,15 +158,15 @@ $userAvatar = $_SESSION['user']['avatar'] ?? (class_exists('Session') ? Session:
         <hr class="border-slate-800 my-2">
         <div class="flex flex-col space-y-2 pt-1">
             <?php if ($isLoggedIn): ?>
-                <a href="<?= $baseUrl ?>/dashboard" class="flex items-center space-x-3 px-3 py-2.5 rounded-xl bg-slate-800/80 text-white font-bold text-xs">
-                    <img src="<?= htmlspecialchars($userAvatar ?? 'assets/images/default-avatar.png', ENT_QUOTES, 'UTF-8') ?>" alt="Avatar" class="w-6 h-6 rounded-full object-cover border border-amber-500">
-                    <span>Mon Tableau de bord</span>
+                <a href="<?= $dashboardLink ?>" class="flex items-center justify-center space-x-3 px-3 py-3 rounded-xl bg-slate-800/80 text-white font-bold text-sm">
+                    <i class="fa-solid <?= ($userRole === 'vendor') ? 'fa-store' : 'fa-user' ?> text-amber-500"></i>
+                    <span><?= ($userRole === 'vendor') ? 'Mon Espace Pro' : 'Mon Compte' ?></span>
                 </a>
-                <a href="<?= $baseUrl ?>/logout" class="px-3 py-2 rounded-lg text-red-400 font-semibold text-xs hover:bg-red-500/10 transition">Déconnexion</a>
+                <a href="<?= $baseUrl ?>/logout.php" class="text-center px-3 py-3 rounded-xl text-red-400 font-bold text-sm hover:bg-red-500/10 transition">Déconnexion</a>
             <?php else: ?>
                 <div class="grid grid-cols-2 gap-2">
-                    <a href="<?= $baseUrl ?>/login.php" class="text-center font-bold text-xs text-slate-200 bg-slate-800 hover:bg-slate-700 py-2.5 rounded-xl transition">Connexion</a>
-                    <a href="<?= $baseUrl ?>/register" class="text-center font-bold text-xs text-slate-950 bg-amber-500 hover:bg-amber-400 py-2.5 rounded-xl transition">Inscription</a>
+                    <a href="<?= $baseUrl ?>/login.php" class="text-center font-bold text-sm text-slate-200 bg-slate-800 hover:bg-slate-700 py-3 rounded-xl transition">Connexion</a>
+                    <a href="<?= $baseUrl ?>/register.php" class="text-center font-bold text-sm text-slate-950 bg-amber-500 hover:bg-amber-400 py-3 rounded-xl transition">Inscription</a>
                 </div>
             <?php endif; ?>
         </div>

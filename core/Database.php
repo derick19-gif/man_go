@@ -1,4 +1,5 @@
 <?php
+namespace App\Core;
 /**
  * Database Connection Manager
  * 

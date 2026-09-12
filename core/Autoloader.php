@@ -21,11 +21,13 @@ class Autoloader
         
         $baseDir = dirname(__DIR__);
 
-        // Mapping PSR-4 de base
-        self::addNamespace('App\\', $baseDir);
+        // Mettre les namespaces spécifiques EN PREMIER
         self::addNamespace('App\\Core\\', $baseDir . '/core');
         self::addNamespace('App\\Modules\\', $baseDir . '/modules');
         self::addNamespace('App\\Classes\\', $baseDir . '/classes');
+        self::addNamespace('App\\Controllers\\', $baseDir . '/classes');
+        // Et le namespace global à la fin
+        self::addNamespace('App\\', $baseDir);
     }
 
     /**

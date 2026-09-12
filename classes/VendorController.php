@@ -11,10 +11,14 @@ class VendorController {
         $this->db = $db;
     }
 
-    // Rcupre les mtriques pour le tableau de bord vendeur
     public function getVendorStats($vendorId) {
-        // Nombre d'annonces actives
-        $stmtProd = $this->db->prepare("SELECT COUNT(*) FROM products WHERE user_id = :uid AND status = 'active'");
+        // Compte les produits actifs via le stand du vendeur
+        $stmtProd = $this->db->prepare("
+            SELECT COUNT(p.id) 
+            FROM products p
+            JOIN stands s ON p.stand_id = s.id
+            WHERE s.user_id = :uid AND p.is_active = 1
+        ");
         $stmtProd->execute([':uid' => $vendorId]);
         $activeProducts = $stmtProd->fetchColumn();
 

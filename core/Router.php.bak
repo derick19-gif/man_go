@@ -1,10 +1,6 @@
 <?php
+
 declare(strict_types=1);
-
-namespace App\Core;
-
-use ReflectionClass;
-use Throwable;
 
 /**
  * Core Router Class
@@ -78,42 +74,42 @@ class Router
         return $this;
     }
 
-    /**
-     * Résout la route correspondant à la requête courante
-     */
-    public function resolve(): void
-    {
-        $method = strtoupper($this->request->getMethod());
-    
-        // Support du Method Spoofing pour les formulaires (ex: POST avec _method=DELETE ou _method=PUT)
-        if ($method === 'POST' && isset($_POST['_method'])) {
-            $overrideMethod = strtoupper(trim((string)$_POST['_method']));
-            if (in_array($overrideMethod, ['PUT', 'PATCH', 'DELETE', 'HEAD'], true)) {
-                $method = $overrideMethod;
+        /**
+         * Résout la route correspondant à la requête courante
+         */
+        public function resolve(): void
+        {
+            $method = strtoupper($this->request->getMethod());
+        
+            // Support du Method Spoofing pour les formulaires (ex: POST avec _method=DELETE ou _method=PUT)
+            if ($method === 'POST' && isset($_POST['_method'])) {
+                $overrideMethod = strtoupper(trim((string)$_POST['_method']));
+                if (in_array($overrideMethod, ['PUT', 'PATCH', 'DELETE', 'HEAD'], true)) {
+                    $method = $overrideMethod;
+                }
             }
+
+            $path = $this->normalizePath($this->request->getPath());
+            $routesForMethod = $this->routes[$method] ?? [];
+
+            foreach ($routesForMethod as $route) {
+                if (preg_match($route['pattern'], $path, $matches)) {
+                    // Extraction des paramètres nommés {slug}, {id}, etc.
+                    $params = array_filter(
+                        $matches,
+                        fn($key): bool => !is_int($key),
+                        ARRAY_FILTER_USE_KEY
+                    );
+
+                    $this->dispatchHandler($route['callback'], $params);
+                    exit; // Arrêt immédiat de l'exécution
+                }
+            }
+
+            $this->handleNotFound();
         }
 
-        $path = $this->normalizePath($this->request->getPath());
-        $routesForMethod = $this->routes[$method] ?? [];
-
-        foreach ($routesForMethod as $route) {
-            if (preg_match($route['pattern'], $path, $matches)) {
-                // Extraction des paramètres nommés {slug}, {id}, etc.
-                $params = array_filter(
-                    $matches,
-                    fn($key): bool => !is_int($key),
-                    ARRAY_FILTER_USE_KEY
-                );
-
-                $this->dispatchHandler($route['callback'], $params);
-                exit; // Arrêt immédiat de l'exécution
-            }
-        }
-
-        $this->handleNotFound();
-    }
-
-    /**
+        /**
      * Normalise l'URL courante en retirant les query params et le prefix BASE_URL_PATH
      */
     private function normalizePath(string $path): string
@@ -167,89 +163,54 @@ class Router
         }
 
         // 4. Autoload dynamique robuste pour les modules et contrôleurs généraux
-        $rawModuleName = str_replace('Controller', '', $className);
-        $singularModule = strtolower($rawModuleName);
-        
-        // Gestion intelligente de la pluralisation (ex: Stand -> stands, Category -> categories, Auth -> auths/auth)
-        if (str_ends_with($singularModule, 'y')) {
-            $pluralModule = substr($singularModule, 0, -1) . 'ies';
-        } else {
-            $pluralModule = $singularModule . 's';
-        }
-
-        // Résolution dynamique avec support explicite des dossiers singuliers/pluriels et du module auth
-        $possiblePaths = [
-            $baseAppPath . '/modules/' . $singularModule . '/controllers/' . $className . '.php',
-            $baseAppPath . '/modules/' . $pluralModule . '/controllers/' . $className . '.php',
-            $baseAppPath . '/controllers/' . $className . '.php',
-            $baseAppPath . '/app/controllers/' . $className . '.php'
-        ];
-
-        $fileFound = false;
-        foreach ($possiblePaths as $file) {
-            if (file_exists($file)) {
-                require_once $file;
-                $fileFound = true;
-                break;
+        if (!class_exists($className)) {
+            $rawModuleName = str_replace('Controller', '', $className);
+            $singularModule = strtolower($rawModuleName);
+            
+            // Gestion intelligente de la pluralisation (ex: Stand -> stands, Category -> categories)
+            if (str_ends_with($singularModule, 'y')) {
+                $pluralModule = substr($singularModule, 0, -1) . 'ies';
+            } else {
+                $pluralModule = $singularModule . 's';
             }
-        }
 
-        // Si toujours non trouvé, recherche globale récursive dans le dossier modules/
-        if (!$fileFound) {
-            foreach (glob($baseAppPath . '/modules/*/controllers/' . $className . '.php') as $globFile) {
-                if (file_exists($globFile)) {
-                    require_once $globFile;
-                    $fileFound = true;
+            $possiblePaths = [
+                $baseAppPath . '/modules/' . $pluralModule . '/controllers/' . $className . '.php',
+                $baseAppPath . '/modules/' . $singularModule . '/controllers/' . $className . '.php',
+                $baseAppPath . '/controllers/' . $className . '.php',
+                $baseAppPath . '/app/controllers/' . $className . '.php'
+            ];
+
+            foreach ($possiblePaths as $file) {
+                if (file_exists($file)) {
+                    require_once $file;
                     break;
                 }
             }
         }
 
-        // Détermination du Nom de Classe Totalement Qualifié (FQCN) avec Namespace
-        $fullyQualifiedClass = $className;
-        if (str_starts_with($className, 'App\\Modules\\')) {
-            $fullyQualifiedClass = $className;
-        } else {
-            // Tente de reconstruire le namespace standard des modules
-            $candidateFqcn = "App\\Modules\\" . ucfirst($rawModuleName) . "\\Controllers\\" . $className;
-            if (class_exists($candidateFqcn)) {
-                $fullyQualifiedClass = $candidateFqcn;
-            } else {
-                // Recherche dans tous les sous-dossiers de modules si la classe existe avec le namespace
-                foreach (['Auth', 'Kyc', 'Stand', 'Product', 'Admin', 'User'] as $modTest) {
-                    $testFqcn = "App\\Modules\\" . $modTest . "\\Controllers\\" . $className;
-                    if (class_exists($testFqcn)) {
-                        $fullyQualifiedClass = $testFqcn;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (!class_exists($fullyQualifiedClass) && !class_exists($className)) {
+        if (!class_exists($className)) {
             $this->response->error("Contrôleur '{$className}' introuvable.", 500);
             return;
         }
 
-        $targetClass = class_exists($fullyQualifiedClass) ? $fullyQualifiedClass : $className;
-
         // 5. Instanciation sécurisée selon le constructeur du contrôleur
         try {
-            $reflection = new ReflectionClass($targetClass);
+            $reflection = new ReflectionClass($className);
             $constructor = $reflection->getConstructor();
 
             if ($constructor !== null && $constructor->getNumberOfParameters() > 0) {
-                $controller = new $targetClass($this->request);
+                $controller = new $className($this->request);
             } else {
-                $controller = new $targetClass();
+                $controller = new $className();
             }
         } catch (Throwable $e) {
-            $this->response->error("Erreur lors de l'instanciation de '{$targetClass}' : " . $e->getMessage(), 500);
+            $this->response->error("Erreur lors de l'instanciation de '{$className}' : " . $e->getMessage(), 500);
             return;
         }
 
         if (!method_exists($controller, $methodName)) {
-            $this->response->error("Méthode '{$methodName}' introuvable dans le contrôleur '{$targetClass}'.", 500);
+            $this->response->error("Méthode '{$methodName}' introuvable dans le contrôleur '{$className}'.", 500);
             return;
         }
 
@@ -258,7 +219,7 @@ class Router
             $result = call_user_func_array([$controller, $methodName], array_values($params));
             $this->processResult($result);
         } catch (Throwable $e) {
-            $this->response->error("Erreur lors de l'exécution de {$targetClass}@{$methodName} : " . $e->getMessage(), 500);
+            $this->response->error("Erreur lors de l'exécution de {$className}@{$methodName} : " . $e->getMessage(), 500);
         }
     }
 
@@ -297,7 +258,8 @@ class Router
             return;
         }
 
-        $this->response->setStatusCode(404)
+        $this->response
+            ->setStatusCode(404)
             ->setContent('<h1>404 - Page Non Trouvée</h1><p>La ressource demandée n\'existe pas.</p>')
             ->send();
     }

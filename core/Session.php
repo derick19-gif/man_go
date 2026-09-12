@@ -78,7 +78,7 @@ class Session
                 
                 // Redirection sécurisée MVC via BASE_URL_PATH
                 $basePath = defined('BASE_URL_PATH') ? BASE_URL_PATH : '/man_go';
-                header('Location: ' . $basePath . '/login?expired=1');
+                header('Location: ' . $basePath . '/login.php?expired=1');
                 exit;
             }
 

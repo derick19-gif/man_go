@@ -7,7 +7,7 @@ require_once '../core/Session.php';
 require_once '../classes/OrderController.php';
 
 use App\Core\Database;
-use App\Core\Session;
+use Session;
 use App\Controllers\OrderController;
 
 $db = Database::getInstance();

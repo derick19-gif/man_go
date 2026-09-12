@@ -1,27 +1,27 @@
 <?php
-// api/chat.php - Routeur d'API pour le Chat MAN GO Shield
-require_once '../config/config.php';
-require_once '../core/Session.php';
-require_once '../core/Database.php';
-require_once '../classes/ChatController.php';
+// api/chat.php
+header('Content-Type: application/json');
+
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../core/Autoloader.php';
 
 use App\Controllers\ChatController;
-use App\Core\Session;
 
-header('Content-Type: application/json');
+// Plus AUCUN "use App\Core\..." ici !
+Session::init();
 
 if (!Session::isAuthenticated()) {
     http_response_code(401);
-    echo json_encode(['status' => 'error', 'message' => 'Non autoris']);
+    echo json_encode(['status' => 'error', 'message' => 'Non autorisé']);
     exit;
 }
 
-$controller = new ChatController();
+$request = new App\Core\Request();
+$controller = new ChatController($request);
 $action = $_REQUEST['action'] ?? '';
 
 try {
     switch ($action) {
-        // --- MESSAGES DE BASE ---
         case 'send':
             $controller->sendMessage();
             break;
@@ -43,13 +43,9 @@ try {
         case 'inbox':
             $controller->getInbox();
             break;
-
-        // --- TIQUETTES (LABELS) ---
         case 'setLabel':
             $controller->setLabel();
             break;
-
-        // --- RPONSES RAPIDES (QUICK REPLIES) ---
         case 'getQuickReplies':
             $controller->getQuickReplies();
             break;
@@ -59,15 +55,12 @@ try {
         case 'deleteQuickReply':
             $controller->deleteQuickReply();
             break;
-
-        // --- PARAMTRES BUSINESS (ACCUEIL & ABSENCE) ---
         case 'getBusinessSettings':
             $controller->getBusinessSettings();
             break;
         case 'saveBusinessSettings':
             $controller->saveBusinessSettings();
             break;
-
         default:
             echo json_encode(['status' => 'error', 'message' => 'Action invalide']);
             break;

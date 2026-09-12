@@ -1,17 +1,14 @@
 <?php
+
 /**
  * Security Helper Class
  * 
  * Provides security utilities: password hashing, CSRF tokens, input validation, etc.
  */
-
 class Security
 {
     /**
      * Hash a password using bcrypt
-     * 
-     * @param string $password
-     * @return string
      */
     public static function hashPassword(string $password): string
     {
@@ -20,10 +17,6 @@ class Security
 
     /**
      * Verify password against hash
-     * 
-     * @param string $password
-     * @param string $hash
-     * @return boolean
      */
     public static function verifyPassword(string $password, string $hash): bool
     {
@@ -32,9 +25,6 @@ class Security
 
     /**
      * Check if password needs rehashing
-     * 
-     * @param string $hash
-     * @return boolean
      */
     public static function needsRehash(string $hash): bool
     {
@@ -43,8 +33,6 @@ class Security
 
     /**
      * Generate CSRF token
-     * 
-     * @return string
      */
     public static function generateCsrfToken(): string
     {
@@ -61,9 +49,6 @@ class Security
 
     /**
      * Verify CSRF token
-     * 
-     * @param string $token
-     * @return boolean
      */
     public static function verifyCsrfToken(string $token): bool
     {
@@ -84,9 +69,6 @@ class Security
 
     /**
      * Sanitize input string
-     * 
-     * @param string $input
-     * @return string
      */
     public static function sanitize(string $input): string
     {
@@ -95,28 +77,14 @@ class Security
 
     /**
      * Validate email address
-     * Accepts standard emails and local/reserved TLDs (e.g. .localhost, .test, .invalid)
-     * 
-     * @param string $email
-     * @return boolean
      */
     public static function validateEmail(string $email): bool
     {
-        // Standard validation
         if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return true;
         }
 
-        // Fallback: accept emails with local/reserved TLDs that FILTER_VALIDATE_EMAIL rejects
-        // e.g. admin@localhost, user@test, contact@invalid
-        $localTlds = [
-            'localhost',
-            'test',
-            'invalid',
-            'example',
-            'local',
-        ];
-
+        $localTlds = ['localhost', 'test', 'invalid', 'example', 'local'];
         $parts = explode('@', $email);
         if (count($parts) !== 2) {
             return false;
@@ -124,12 +92,10 @@ class Security
 
         [$local, $domain] = $parts;
 
-        // Validate local part (basic email-safe characters)
         if (!preg_match('/^[a-zA-Z0-9.!#$%&\'*+\/=?^_`{|}~-]+$/', $local)) {
             return false;
         }
 
-        // Check if domain is a local/reserved TLD (no dots)
         if (in_array(strtolower($domain), $localTlds, true)) {
             return strlen($local) >= 1 && strlen($local) <= 64;
         }
@@ -139,9 +105,6 @@ class Security
 
     /**
      * Validate password strength
-     * 
-     * @param string $password
-     * @return array ['valid' => bool, 'errors' => string[]]
      */
     public static function validatePasswordStrength(string $password): array
     {
@@ -171,9 +134,6 @@ class Security
 
     /**
      * Generate a secure random token
-     * 
-     * @param int $length
-     * @return string
      */
     public static function generateToken(int $length = 32): string
     {
@@ -182,8 +142,6 @@ class Security
 
     /**
      * Verify IP address hasn't changed
-     * 
-     * @return boolean
      */
     public static function verifyIpAddress(): bool
     {
@@ -197,8 +155,6 @@ class Security
 
     /**
      * Get client IP address
-     * 
-     * @return string
      */
     public static function getClientIp(): string
     {
@@ -214,13 +170,7 @@ class Security
     }
 
     /**
-     * Rate limit check using key-value store (can be extended to Redis)
-     * Falls back to $_SESSION if APCu is not available.
-     * 
-     * @param string $key
-     * @param int $maxAttempts
-     * @param int $windowSeconds
-     * @return array ['allowed' => bool, 'remaining' => int, 'retry_after' => int|null]
+     * Rate limit check using key-value store
      */
     public static function checkRateLimit(string $key, int $maxAttempts = 5, int $windowSeconds = 900): array
     {
@@ -233,125 +183,69 @@ class Security
         return self::checkRateLimitSession($cacheKey, $maxAttempts, $windowSeconds);
     }
 
-    /**
-     * Rate limit check using APCu cache
-     * 
-     * @param string $cacheKey
-     * @param int $maxAttempts
-     * @param int $windowSeconds
-     * @return array
-     */
     private static function checkRateLimitApcu(string $cacheKey, int $maxAttempts, int $windowSeconds): array
     {
         $attempts = apcu_fetch($cacheKey);
 
         if ($attempts === false) {
             apcu_store($cacheKey, 1, $windowSeconds);
-            return [
-                'allowed' => true,
-                'remaining' => $maxAttempts - 1,
-                'retry_after' => null,
-            ];
+            return ['allowed' => true, 'remaining' => $maxAttempts - 1, 'retry_after' => null];
         }
 
         if ($attempts >= $maxAttempts) {
             $ttl = apcu_cache_info('user')[$cacheKey]['ttl'] ?? $windowSeconds;
-            return [
-                'allowed' => false,
-                'remaining' => 0,
-                'retry_after' => $ttl,
-            ];
+            return ['allowed' => false, 'remaining' => 0, 'retry_after' => $ttl];
         }
 
         apcu_inc($cacheKey);
 
-        return [
-            'allowed' => true,
-            'remaining' => $maxAttempts - $attempts - 1,
-            'retry_after' => null,
-        ];
+        return ['allowed' => true, 'remaining' => $maxAttempts - $attempts - 1, 'retry_after' => null];
     }
 
-    /**
-     * Rate limit check using $_SESSION (fallback when APCu is unavailable)
-     * 
-     * @param string $cacheKey
-     * @param int $maxAttempts
-     * @param int $windowSeconds
-     * @return array
-     */
     private static function checkRateLimitSession(string $cacheKey, int $maxAttempts, int $windowSeconds): array
     {
-        // Ensure session is started
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
         }
 
-        // Initialize rate limit storage in session if needed
         if (!isset($_SESSION['_rate_limits'])) {
             $_SESSION['_rate_limits'] = [];
         }
 
         $now = time();
 
-        // Clean expired entries
         foreach ($_SESSION['_rate_limits'] as $existingKey => $data) {
             if ($data['expires_at'] <= $now) {
                 unset($_SESSION['_rate_limits'][$existingKey]);
             }
         }
 
-        // Check current key
         if (!isset($_SESSION['_rate_limits'][$cacheKey])) {
             $_SESSION['_rate_limits'][$cacheKey] = [
                 'attempts' => 1,
                 'expires_at' => $now + $windowSeconds,
             ];
-            return [
-                'allowed' => true,
-                'remaining' => $maxAttempts - 1,
-                'retry_after' => null,
-            ];
+            return ['allowed' => true, 'remaining' => $maxAttempts - 1, 'retry_after' => null];
         }
 
         $record = &$_SESSION['_rate_limits'][$cacheKey];
 
-        // If window expired, reset
         if ($record['expires_at'] <= $now) {
             $record['attempts'] = 1;
             $record['expires_at'] = $now + $windowSeconds;
-            return [
-                'allowed' => true,
-                'remaining' => $maxAttempts - 1,
-                'retry_after' => null,
-            ];
+            return ['allowed' => true, 'remaining' => $maxAttempts - 1, 'retry_after' => null];
         }
 
         if ($record['attempts'] >= $maxAttempts) {
             $retryAfter = $record['expires_at'] - $now;
-            return [
-                'allowed' => false,
-                'remaining' => 0,
-                'retry_after' => $retryAfter,
-            ];
+            return ['allowed' => false, 'remaining' => 0, 'retry_after' => $retryAfter];
         }
 
         $record['attempts']++;
 
-        return [
-            'allowed' => true,
-            'remaining' => $maxAttempts - $record['attempts'],
-            'retry_after' => null,
-        ];
+        return ['allowed' => true, 'remaining' => $maxAttempts - $record['attempts'], 'retry_after' => null];
     }
 
-    /**
-     * Log security event
-     * 
-     * @param string $event
-     * @param array $data
-     * @return void
-     */
     public static function logSecurityEvent(string $event, array $data = []): void
     {
         $logData = array_merge([

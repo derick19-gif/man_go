@@ -2,11 +2,8 @@
 
 declare(strict_types=1);
 
-/**
- * HTTP Request Handler
- * 
- * Encapsulates HTTP request data and provides robust helper methods.
- */
+namespace App\Core;
+
 class Request
 {
     private string $method;

@@ -1,7 +1,13 @@
 <?php
 namespace Modules\Kyc\Models;
 
-use Database;
+// AJOUTEZ CE BLOC POUR LIER LA BASE DE DONNÉES :
+$dbPath = dirname(dirname(dirname(__DIR__))) . '/core/Database.php';
+if (file_exists($dbPath)) {
+    require_once $dbPath;
+}
+
+use App\Core\Database;
 use PDO;
 
 class KycModel
@@ -10,12 +16,9 @@ class KycModel
 
     public function __construct()
     {
-        $this->db = Database::connect();
+        $this->db = Database::getInstance(); // Ou Database::connect() selon votre configuration
     }
 
-    /**
-     * Récupère le statut KYC d'un utilisateur
-     */
     public function getByUserId(int $userId): ?array
     {
         $stmt = $this->db->prepare("SELECT * FROM user_kyc WHERE user_id = :user_id LIMIT 1");
@@ -24,9 +27,6 @@ class KycModel
         return $result ?: null;
     }
 
-    /**
-     * Soumet ou met à jour un dossier KYC
-     */
     public function submit(int $userId, array $data): bool
     {
         $existing = $this->getByUserId($userId);
@@ -40,6 +40,8 @@ class KycModel
                     tax_id = :tax_id,
                     primary_manager_name = :primary_manager_name,
                     primary_manager_id_card = :primary_manager_id_card,
+                    id_issue_date = :id_issue_date,
+                    id_expiration_date = :id_expiration_date,
                     secondary_manager_name = :secondary_manager_name,
                     secondary_manager_id_card = :secondary_manager_id_card,
                     id_document_path = :id_document_path,
@@ -52,12 +54,12 @@ class KycModel
             $stmt = $this->db->prepare("
                 INSERT INTO user_kyc (
                     user_id, account_type, company_name, registration_number, tax_id,
-                    primary_manager_name, primary_manager_id_card, secondary_manager_name, 
-                    secondary_manager_id_card, id_document_path, additional_document_path, status, created_at
+                    primary_manager_name, primary_manager_id_card, id_issue_date, id_expiration_date, 
+                    secondary_manager_name, secondary_manager_id_card, id_document_path, additional_document_path, status, created_at
                 ) VALUES (
                     :user_id, :account_type, :company_name, :registration_number, :tax_id,
-                    :primary_manager_name, :primary_manager_id_card, :secondary_manager_name, 
-                    :secondary_manager_id_card, :id_document_path, :additional_document_path, 'pending', NOW()
+                    :primary_manager_name, :primary_manager_id_card, :id_issue_date, :id_expiration_date, 
+                    :secondary_manager_name, :secondary_manager_id_card, :id_document_path, :additional_document_path, 'pending', NOW()
                 )
             ");
         }
@@ -70,6 +72,8 @@ class KycModel
             ':tax_id' => $data['tax_id'] ?? null,
             ':primary_manager_name' => $data['primary_manager_name'],
             ':primary_manager_id_card' => $data['primary_manager_id_card'],
+            ':id_issue_date' => $data['id_issue_date'],
+            ':id_expiration_date' => $data['id_expiration_date'],
             ':secondary_manager_name' => $data['secondary_manager_name'] ?? null,
             ':secondary_manager_id_card' => $data['secondary_manager_id_card'] ?? null,
             ':id_document_path' => $data['id_document_path'],

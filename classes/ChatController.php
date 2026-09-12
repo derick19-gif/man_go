@@ -3,8 +3,9 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
-use App\Core\Session;
-use App\Core\Database;
+use App\Core\Database; // <-- LE VOILÀ ! Le bon chemin vers la base de données
+use App\Core\Request;  // <-- Pareil pour Request, il est dans Core
+use Session;           // <-- Session reste global, on n'y touche pas
 
 class ChatController extends Controller {
 

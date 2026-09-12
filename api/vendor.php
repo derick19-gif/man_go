@@ -1,32 +1,37 @@
 <?php
+// api/vendor.php
 header('Content-Type: application/json');
 
-require_once '../config/config.php';
-require_once '../core/Database.php';
-require_once '../core/Session.php';
-require_once '../classes/VendorController.php';
+require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../core/Autoloader.php';
 
-use App\Core\Database;
-use App\Core\Session;
 use App\Controllers\VendorController;
 
+// Plus AUCUN "use App\Core\..." ici ! On appelle directement Session et Database
+Session::init();
+
 if (!Session::isAuthenticated()) {
-    echo json_encode(['status' => 'error', 'message' => 'Non autoris']);
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'Non autorisé']);
     exit;
 }
 
-$db = Database::getInstance();
-$controller = new VendorController($db);
-$action = $_GET['action'] ?? $_POST['action'] ?? '';
-$current_user_id = Session::getUserId();
+try {
+    $db = function_exists('getDBConnection') ? getDBConnection() : Database::getInstance();
+    $controller = new VendorController($db);
+    $action = $_GET['action'] ?? $_POST['action'] ?? '';
+    $current_user_id = Session::getUserId();
 
-switch ($action) {
-    case 'getStats':
-        $stats = $controller->getVendorStats($current_user_id);
-        echo json_encode($stats);
-        break;
-
-    default:
-        echo json_encode(['status' => 'error', 'message' => 'Action invalide']);
-        break;
+    switch ($action) {
+        case 'getStats':
+            $stats = $controller->getVendorStats($current_user_id);
+            echo json_encode($stats);
+            break;
+        default:
+            echo json_encode(['status' => 'error', 'message' => 'Action invalide']);
+            break;
+    }
+} catch (Exception $e) {
+    http_response_code(500);
+    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
 }

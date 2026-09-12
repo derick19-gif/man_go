@@ -1,14 +1,22 @@
 <?php
-// login.php
 require_once __DIR__ . '/config/config.php';
-require_once __DIR__ . '/core/Session.php';
-require_once __DIR__ . '/core/Countries.php';
+require_once __DIR__ . '/core/Autoloader.php';
+
+// Pas de "use" ici. L'autoloader va activer son Fallback et trouver Session.php tout seul !
 
 Session::init();
 
-// Rediriger si l'utilisateur est déjà connecté
-if (Session::isAuthenticated()) {
-    header('Location: dashboard.php');
+// Rediriger intelligemment si l'utilisateur est déjà connecté
+if (Session::isAuthenticated() || Session::get('user_id')) {
+    $role = Session::get('user_role');
+    
+    if ($role === 'vendor') {
+        header('Location: vendor_dir/dashboard.php');
+    } elseif ($role === 'admin') {
+        header('Location: admin/dashboard.php');
+    } else {
+        header('Location: client/views/dashboard.php');
+    }
     exit;
 }
 
@@ -64,14 +72,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (isset($user['status']) && $user['status'] !== 'active') {
                     $error = "Votre compte est suspendu ou inactif.";
                 } else {
+                    $userName = $user['full_name'] ?? $user['name'] ?? $user['firstname'] ?? explode('@', $user['email'])[0];
+
+                    // 1. On vérifie l'ID du rôle dans la base (4 = Vendeur, 5 = Acheteur)
+                    $roleId = (int) ($user['role_id'] ?? 5);
+                    $roleStr = ($roleId === 4) ? 'vendor' : 'buyer'; // On le traduit en texte pour la session
+
                     Session::create([
                         'user_id'    => (int) $user['id'],
-                        'user_name'  => $user['full_name'] ?? $user['name'] ?? '',
+                        'user_name'  => ucfirst($userName),
                         'user_email' => $user['email'] ?? '',
-                        'user_role'  => $user['role'] ?? 'user'
+                        'user_role'  => $roleStr,
+                        'user' => [
+                            'id'    => (int) $user['id'],
+                            'name'  => ucfirst($userName),
+                            'email' => $user['email'] ?? '',
+                            'role'  => $roleStr
+                        ]
                     ]);
 
-                    header('Location: dashboard.php');
+                    // 2. Redirection parfaite selon le rôle et l'arborescence
+                    if ($roleId === 4) {
+                        $redirectUrl = 'vendor_dir/dashboard.php';
+                    } elseif ($roleId === 1 || $roleId === 2) {
+                        $redirectUrl = 'admin/dashboard.php';
+                    } else {
+                        // Acheteur : on le renvoie vers son espace client
+                        $redirectUrl = 'client/views/dashboard.php';
+                    }
+                    
+                    header('Location: ' . $redirectUrl);
                     exit;
                 }
             } else {

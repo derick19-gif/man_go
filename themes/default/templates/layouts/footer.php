@@ -29,7 +29,7 @@
             <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px;">
                 <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/plans" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Forfaits & Abonnements</a></li>
                 <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/referral" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Programme de Parrainage</a></li>
-                <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/verification" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Certification KYC Vendeur</a></li>
+                <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/verification.php" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Certification KYC Vendeur</a></li>
                 <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/faq.php" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Centre d'aide & FAQ</a></li>
             </ul>
         </div>

@@ -1,4 +1,5 @@
 <?php
+namespace App\Core;
 /**
  * Base Controller Class
  * 

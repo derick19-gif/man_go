@@ -2,15 +2,19 @@
 // dashboard.php
 
 // 1. Inclusion de la configuration (contient getDBConnection()) et de la classe Session
-require_once __DIR__ . '/config/config.php';
-require_once __DIR__ . '/core/Session.php';
-require_once __DIR__ . '/includes/NotificationManager.php';
+require_once __DIR__ . '/../../config/config.php';
+require_once __DIR__ . '/../../core/Session.php';
+
+// Inclusion optionnelle du NotificationManager s'il existe
+if (file_exists(__DIR__ . '/../../includes/NotificationManager.php')) {
+    require_once __DIR__ . '/../../includes/NotificationManager.php';
+}
 
 Session::init();
 
-// 2. Authentification via la classe Session
+// 2. Authentification via la classe Session (On remonte à la racine pour le login)
 if (!Session::get('user_id')) {
-    header('Location: login.php');
+    header('Location: ../../login.php');
     exit;
 }
 
@@ -29,23 +33,37 @@ if ($page < 1) {
 
 try {
     // Informations utilisateur
-    $stmtUser = $pdo->prepare("SELECT id, name, email, avatar FROM users WHERE id = :id LIMIT 1");
+    $stmtUser = $pdo->prepare("SELECT id, firstname, lastname, email, avatar FROM users WHERE id = :id LIMIT 1");
     $stmtUser->execute([':id' => $userId]);
     $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-    if (!$user) {
+    if ($user) {
+        // On fusionne le prénom et le nom pour recréer la clé 'name' attendue par le design
+        $user['name'] = trim($user['firstname'] . ' ' . $user['lastname']);
+    } else {
         session_destroy();
-        header('Location: login.php');
+        header('Location: ../../login.php');
         exit;
     }
 
-    // Statistiques globales
+    $role = Session::get('user_role') ?? 'buyer';
+
+    // Redirection si l'utilisateur n'est pas un simple acheteur (client)
+    if ($role === 'admin' || $role === 'super_admin') {
+        header('Location: ../../admin/dashboard.php');
+        exit;
+    } elseif ($role === 'vendor' || $role === 'vendeur') {
+        header('Location: ../../vendor_dir/dashboard.php');
+        exit;
+    }
+
+    // Statistiques globales basées sur la table 'ads' (annonces)
     $stmtStats = $pdo->prepare("
         SELECT 
             COUNT(id) AS total_listings,
-            COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) AS active_listings,
-            COALESCE(SUM(views_count), 0) AS total_views
-        FROM listings 
+            COALESCE(SUM(CASE WHEN status = 'PUBLISHED' THEN 1 ELSE 0 END), 0) AS active_listings,
+            0 AS total_views 
+        FROM ads 
         WHERE user_id = :id
     ");
     $stmtStats->execute([':id' => $userId]);
@@ -62,10 +80,10 @@ try {
     // Calcul de l'OFFSET final
     $offset = ($page - 1) * $limit;
 
-    // Requête des annonces paginées
+    // Requête des annonces paginées (Adaptée au schema.sql avec la table 'ads')
     $stmtListings = $pdo->prepare("
-        SELECT id, title, category, price, currency, status, created_at, views_count, image 
-        FROM listings 
+        SELECT id, title, category_id AS category, price, currency, status, created_at, 0 AS views_count, main_image AS image 
+        FROM ads 
         WHERE user_id = :id 
         ORDER BY created_at DESC 
         LIMIT :limit OFFSET :offset
@@ -77,33 +95,39 @@ try {
     $recentListings = $stmtListings->fetchAll(PDO::FETCH_ASSOC);
 
     // Récupération des stands / boutiques mis en avant
-    $stmtShops = $pdo->prepare("
+    $stmtstands = $pdo->prepare("
         SELECT id, name, logo, banner, status 
-        FROM shops 
-        WHERE status = 'active' 
+        FROM stands 
+        WHERE status = 'ACTIVE' 
         ORDER BY RAND() 
         LIMIT 8
     ");
-    $stmtShops->execute();
-    $featuredShops = $stmtShops->fetchAll(PDO::FETCH_ASSOC);
+    $stmtstands->execute();
+    $featuredstands = $stmtstands->fetchAll(PDO::FETCH_ASSOC);
 
     // Notifications
-    $notifManager = new NotificationManager($pdo);
-    $notifications = $notifManager->getUserNotifications($userId, 5);
-    $unreadNotifsCount = (int)$notifManager->getUnreadCount($userId);
+    if (class_exists('NotificationManager')) {
+        $notifManager = new NotificationManager($pdo);
+        $notifications = $notifManager->getUserNotifications($userId, 5);
+        $unreadNotifsCount = (int)$notifManager->getUnreadCount($userId);
+    } else {
+        $notifications = [];
+        $unreadNotifsCount = 0;
+    }
 
 } catch (PDOException $e) {
     error_log("Erreur Dashboard PDO: " . $e->getMessage());
     $user = ['name' => 'Utilisateur', 'email' => '', 'avatar' => null];
     $stats = ['total_listings' => 0, 'active_listings' => 0, 'total_views' => 0];
     $recentListings = [];
-    $featuredShops = [];
+    $featuredstands = [];
     $notifications = [];
     $unreadNotifsCount = 0;
     $totalPages = 1;
 }
 
 $pageTitle = "Tableau de bord dynamique - MAN GO";
+$baseUrl = defined('BASE_URL') ? BASE_URL : '/man_go';
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -246,7 +270,7 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
 </head>
 <body>
 
-    <?php include __DIR__ . '/themes/default/templates/layouts/header.php'; ?>
+    <?php include __DIR__ . '/../../themes/default/templates/layouts/header.php'; ?>
 
     <div class="container-fluid">
         <div class="row">
@@ -264,39 +288,39 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
 
                 <ul class="nav nav-pills flex-column mb-auto gap-2">
                     <li class="nav-item">
-                        <a href="<?= BASE_URL ?>/" class="nav-link active">
+                        <a href="<?= $baseUrl ?>/" class="nav-link active">
                             <i class="bi bi-speedometer2 me-2"></i> Vue d'ensemble
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?= BASE_URL ?>/listings" class="nav-link">
+                        <a href="<?= $baseUrl ?>/listings" class="nav-link">
                             <i class="bi bi-card-list me-2"></i> Mes annonces
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?= BASE_URL ?>/stands" class="nav-link">
+                        <a href="<?= $baseUrl ?>/stands" class="nav-link">
                             <i class="bi bi-shop me-2"></i> Ma boutique
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?= BASE_URL ?>/services" class="nav-link">
+                        <a href="<?= $baseUrl ?>/services" class="nav-link">
                             <i class="bi bi-chat-dots me-2"></i> Services
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?= BASE_URL ?>/favorites" class="nav-link">
+                        <a href="<?= $baseUrl ?>/favorites" class="nav-link">
                             <i class="bi bi-heart me-2"></i> Favoris
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a href="<?= BASE_URL ?>/profile-settings" class="nav-link">
+                        <a href="<?= $baseUrl ?>/profile-settings" class="nav-link">
                             <i class="bi bi-gear me-2"></i> Paramètres
                         </a>
                     </li>
                 </ul>
                 <hr class="my-3 text-muted opacity-25">
                 <div>
-                    <a href="<?= BASE_URL ?>/logout" class="nav-link text-danger fw-semibold hover-danger">
+                    <a href="<?= $baseUrl ?>/logout.php" class="nav-link text-danger fw-semibold hover-danger">
                         <i class="bi bi-box-arrow-right me-2"></i> Déconnexion
                     </a>
                 </div>
@@ -347,14 +371,14 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
                             </ul>
                         </div>
 
-                        <a href="publish.php" class="btn btn-primary rounded-pill px-4 py-2 fw-semibold d-flex align-items-center">
+                        <a href="../../publish.php" class="btn btn-primary rounded-pill px-4 py-2 fw-semibold d-flex align-items-center">
                             <i class="bi bi-plus-lg me-2"></i> Publier une annonce
                         </a>
                     </div>
                 </div>
 
                 <!-- Section Dynamique : Stands / Boutiques -->
-                <?php if (!empty($featuredShops)): ?>
+                <?php if (!empty($featuredstands)): ?>
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="fw-bold text-dark mb-0 d-flex align-items-center">
@@ -364,13 +388,13 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
                         </div>
                         <div class="swiper swiper-container">
                             <div class="swiper-wrapper">
-                                <?php foreach ($featuredShops as $shop): ?>
+                                <?php foreach ($featuredstands as $shop): ?>
                                     <div class="swiper-slide">
                                         <div class="shop-card text-center pb-3">
                                             <div class="shop-banner" style="background-image: url('<?= htmlspecialchars($shop['banner'] ?? 'assets/images/default-banner.jpg', ENT_QUOTES, 'UTF-8') ?>');"></div>
                                             <img src="<?= htmlspecialchars($shop['logo'] ?? 'assets/images/default-shop.png', ENT_QUOTES, 'UTF-8') ?>" class="shop-logo" alt="Logo">
                                             <h6 class="fw-bold mt-2 mb-1 text-truncate px-2 text-dark"><?= htmlspecialchars($shop['name'] ?? '', ENT_QUOTES, 'UTF-8') ?></h6>
-                                            <a href="shop-detail.php?id=<?= (int)$shop['id'] ?>" class="btn btn-sm btn-outline-primary mt-2 py-1 px-4 rounded-pill fw-medium fs-7">Visiter</a>
+                                            <a href="../../shop-detail.php?id=<?= (int)$shop['id'] ?>" class="btn btn-sm btn-outline-primary mt-2 py-1 px-4 rounded-pill fw-medium fs-7">Visiter</a>
                                         </div>
                                     </div>
                                 <?php endforeach; ?>
@@ -467,20 +491,20 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
                                                     </div>
                                                 </td>
                                                 <td class="fw-bold text-dark">
-                                                    <?= htmlspecialchars(number_format((float)($listing['price'] ?? 0), 0, ',', ' '), ENT_QUOTES, 'UTF-8') ?> 
+                                                    <?= number_format((float)($listing['price'] ?? 0), 2, ',', ' ') ?> 
                                                     <span class="text-muted fw-normal fs-7"><?= htmlspecialchars($listing['currency'] ?? 'FCFA', ENT_QUOTES, 'UTF-8') ?></span>
                                                 </td>
                                                 <td>
                                                     <?php
-                                                    $statusClass = match($listing['status'] ?? '') {
-                                                        'active'  => 'badge-active',
-                                                        'pending' => 'badge-pending',
-                                                        'sold'    => 'badge-sold',
-                                                        default   => 'bg-secondary text-white'
+                                                    $statusClass = match(strtoupper($listing['status'] ?? '')) {
+                                                        'PUBLISHED', 'ACTIVE' => 'badge-active',
+                                                        'DRAFT', 'PENDING'    => 'badge-pending',
+                                                        'ARCHIVED', 'SOLD'    => 'badge-sold',
+                                                        default               => 'bg-secondary text-white'
                                                     };
                                                     ?>
                                                     <span class="badge px-3 py-2 rounded-pill <?= $statusClass ?>">
-                                                        <?= htmlspecialchars(ucfirst($listing['status'] ?? 'Inconnu'), ENT_QUOTES, 'UTF-8') ?>
+                                                        <?= htmlspecialchars(ucfirst(strtolower($listing['status'] ?? 'Inconnu')), ENT_QUOTES, 'UTF-8') ?>
                                                     </span>
                                                 </td>
                                                 <td class="text-muted small">
@@ -490,10 +514,10 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
                                                     <i class="bi bi-eye text-muted me-1"></i> <?= htmlspecialchars((string)((int)($listing['views_count'] ?? 0)), ENT_QUOTES, 'UTF-8') ?>
                                                 </td>
                                                 <td class="text-end pe-4">
-                                                    <a href="edit-listing.php?id=<?= (int)$listing['id'] ?>" class="btn btn-sm btn-light border rounded-circle p-2 me-1 text-primary shadow-sm" title="Éditer">
+                                                    <a href="../../edit-listing.php?id=<?= (int)$listing['id'] ?>" class="btn btn-sm btn-light border rounded-circle p-2 me-1 text-primary shadow-sm" title="Éditer">
                                                         <i class="bi bi-pencil"></i>
                                                     </a>
-                                                    <a href="listing-detail.php?id=<?= (int)$listing['id'] ?>" class="btn btn-sm btn-light border rounded-circle p-2 text-secondary shadow-sm" title="Voir">
+                                                    <a href="../../listing-detail.php?id=<?= (int)$listing['id'] ?>" class="btn btn-sm btn-light border rounded-circle p-2 text-secondary shadow-sm" title="Voir">
                                                         <i class="bi bi-eye"></i>
                                                     </a>
                                                 </td>
@@ -504,7 +528,7 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
                                             <td colspan="6" class="text-center py-5 text-muted">
                                                 <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary opacity-50"></i>
                                                 Aucune annonce trouvée sur cette page.<br>
-                                                <a href="publish.php" class="btn btn-sm btn-primary rounded-pill px-4 mt-3">Créer une annonce</a>
+                                                <a href="../../publish.php" class="btn btn-sm btn-primary rounded-pill px-4 mt-3">Créer une annonce</a>
                                             </td>
                                         </tr>
                                     <?php endif; ?>
@@ -542,8 +566,8 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
         </div>
     </div>
 
-    <!-- Footer -->
-    <?php include __DIR__ . '/themes/default/templates/layouts/footer.php'; ?>
+    <!-- Footer (Correction de la balise PHP non fermée) -->
+    <?php include __DIR__ . '/../../themes/default/templates/layouts/footer.php'; ?>
 
     <!-- Scripts Javascript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -574,7 +598,7 @@ $pageTitle = "Tableau de bord dynamique - MAN GO";
 
         // Fonction pour rafraîchir les notifications via AJAX
         function refreshNotifications() {
-            fetch('api/get-notifications.php')
+            fetch('../../api/get-notifications.php')
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {

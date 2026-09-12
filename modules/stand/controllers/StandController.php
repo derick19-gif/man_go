@@ -1,60 +1,80 @@
 <?php
-// modules/stands/controllers/StandController.php
+// modules/stand/controllers/StandController.php
 
-if (!class_exists('Model')) {
-    if (defined('APP_PATH') && file_exists(APP_PATH . '/core/Model.php')) {
-        require_once APP_PATH . '/core/Model.php';
-    } else {
-        $fallbackPath = __DIR__ . '/../../../core/Model.php';
-        if (file_exists($fallbackPath)) {
-            require_once $fallbackPath;
-        }
-    }
-}
+use App\Core\Controller;
+use App\Core\Session;
 
-if (!class_exists('Controller')) {
-    if (defined('APP_PATH') && file_exists(APP_PATH . '/core/Controller.php')) {
-        require_once APP_PATH . '/core/Controller.php';
-    } else {
-        $fallbackPath = __DIR__ . '/../../../core/Controller.php';
-        if (file_exists($fallbackPath)) {
-            require_once $fallbackPath;
-        }
-    }
-}
-
-$standModelPath = __DIR__ . '/../models/Stand.php';
-if (file_exists($standModelPath)) {
-    require_once $standModelPath;
-}
+// Inclusion absolue, directe et forcée du Modèle !
+require_once __DIR__ . '/../models/Stand.php';
 
 class StandController extends Controller {
 
-        public function index() {
+    public function index() {
         $standModel = new Stand();
-
         $search   = trim(filter_input(INPUT_GET, 'search', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
         $location = trim(filter_input(INPUT_GET, 'location', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
         $category = trim(filter_input(INPUT_GET, 'category', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
 
-        $page   = max(1, (int)($_GET['page'] ?? 1));
-        $limit  = 12;
-        $offset = ($page - 1) * $limit;
-
-        $totalStands = $standModel->countActiveStands($search, $location, $category);
-        $totalPages  = max(1, (int)ceil($totalStands / $limit));
-        $stands      = $standModel->getActiveStands($search, $location, $category, $limit, $offset);
-        $categories  = $standModel->getCategories();
+        $stands = method_exists($standModel, 'getActiveStands') ? $standModel->getActiveStands($search, $location, $category) : [];
 
         echo $this->render('index', [
             'stands'      => $stands,
-            'totalStands' => $totalStands,
-            'totalPages'  => $totalPages,
-            'page'        => $page,
             'search'      => $search,
             'location'    => $location,
-            'category'    => $category,
-            'categories'  => $categories
+            'category'    => $category
         ]);
+    }
+
+    public function detail() {
+        $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        $standModel = new Stand();
+        $stand = $standModel->find($id);
+
+        if (!$stand) {
+            http_response_code(404);
+            echo "Boutique introuvable.";
+            return;
+        }
+
+        $listings = $standModel->getStandListings($id);
+
+        echo $this->render('detail', [
+            'stand'    => $stand,
+            'listings' => $listings
+        ]);
+    }
+
+    public function create() {
+        echo $this->render('create', []);
+    }
+
+    public function store() {
+        $name        = trim($_POST['name'] ?? '');
+        $description = trim($_POST['description'] ?? '');
+        $category    = trim($_POST['category'] ?? '');
+        $city        = trim($_POST['city'] ?? '');
+        $address     = trim($_POST['address'] ?? '');
+        $phone       = trim($_POST['phone'] ?? '');
+
+        $standModel = new Stand();
+        $success = $standModel->createStand([
+            'user_id'     => Session::get('user_id') ?? 1,
+            'name'        => $name,
+            'description' => $description,
+            'category'    => $category,
+            'city'        => $city,
+            'address'     => $address,
+            'phone'       => $phone,
+            'logo_url'    => 'assets/images/placeholder.jpg',
+            'banner_url'  => 'assets/images/placeholder.jpg'
+        ]);
+
+        if ($success) {
+            header('Location: ../stands');
+            exit;
+        } else {
+            header('Location: create?error=1');
+            exit;
+        }
     }
 }

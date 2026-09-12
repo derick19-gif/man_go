@@ -7,14 +7,8 @@ ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 // 🛡️ NETTOYAGE GLOBAL : Si l'URL contient /index.php, on le retire discrètement 
-// pour que le routeur voie uniquement une route propre (ex: / au lieu de /index.php)
 if (isset($_SERVER['REQUEST_URI'])) {
-    // Remplace /man_go/index.php par /man_go/ ou /index.php par /
     $_SERVER['REQUEST_URI'] = str_replace('/index.php', '', $_SERVER['REQUEST_URI']);
 }
 
@@ -26,16 +20,24 @@ require_once __DIR__ . '/core/Request.php';
 require_once __DIR__ . '/core/Response.php';
 require_once __DIR__ . '/core/Router.php';
 
+// ✨ LA CORRECTION MAGIQUE EST ICI : 
+// On supprime le vieux session_start() et on initialise la session 
+// UNIQUEMENT via votre classe haute sécurité, APRÈS l'avoir chargée.
+Session::init();
+
+use App\Core\Router;
+
 // --- CONFIGURATION DES ROUTES ---
 $router = new Router();
 
 // Route de la page d'accueil
 $router->get('/', 'HomeController@index');
 
-// Routes principales (Correction des correspondances)
+// Routes principales
 $router->get('/listings', 'ListingController@index');
 $router->get('/publish', 'ListingController@create');
 $router->post('/publish', 'ListingController@store');
+$router->get('/client/dashboard', 'DashboardController@index');
 $router->get('/stands', 'StandController@index');
 $router->get('/services', 'ServiceController@index'); 
 
@@ -44,6 +46,10 @@ $router->get('/login', 'AuthController@loginAction');
 $router->post('/login', 'AuthController@authenticateAction');
 $router->get('/register', 'AuthController@registerAction');
 $router->get('/logout', 'AuthController@logoutAction');
+$router->get('/stands/detail', 'StandController@detail');
+$router->get('/stands/create', 'StandController@create');
+$router->post('/stands/store', 'StandController@store');
+
 // Routes pour le module KYC
 $router->get('/kyc', 'Modules\Kyc\Controllers\KycController@index');
 $router->post('/kyc/submit', 'Modules\Kyc\Controllers\KycController@submit');

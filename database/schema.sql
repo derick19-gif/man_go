@@ -5,6 +5,9 @@
 -- ============================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
+DROP TABLE IF EXISTS `chat_messages`;
+DROP TABLE IF EXISTS `orders`;
+DROP TABLE IF EXISTS `products`;
 DROP TABLE IF EXISTS `hero_slides`;
 DROP TABLE IF EXISTS `translations`;
 DROP TABLE IF EXISTS `languages`;
@@ -194,3 +197,30 @@ INSERT INTO `hero_slides` (`image_url`, `title`, `sort_order`, `is_active`) VALU
 ('https://images.unsplash.com/photo-1472851294608-062f824d29cc?auto=format&fit=crop&w=1920&q=80', 'Commerce & Électronique', 1, 1),
 ('https://images.unsplash.com/photo-1556742049-0a670f4a4591?auto=format&fit=crop&w=1920&q=80', 'Boutiques & Services', 2, 1),
 ('https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=1920&q=80', 'Partenariats & Affaires', 3, 1);
+
+-- ----------------------------------------------------------------------------
+-- 9. COMMANDES ET TRANSACTIONS (ORDERS)
+-- ----------------------------------------------------------------------------
+CREATE TABLE `orders` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `vendor_id` INT NOT NULL,
+    `customer_id` INT DEFAULT NULL,
+    `amount` DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    `status` VARCHAR(50) DEFAULT 'completed',
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`vendor_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`customer_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------------------------------------------------------
+-- 10. MESSAGERIE INTERNE ET CHAT (CHAT_MESSAGES)
+-- ----------------------------------------------------------------------------
+CREATE TABLE `chat_messages` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `sender_id` INT NOT NULL,
+    `receiver_id` INT NOT NULL,
+    `message` TEXT NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`sender_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+    FOREIGN KEY (`receiver_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

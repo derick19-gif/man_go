@@ -1,7 +1,7 @@
 <?php
 namespace App\Models;
 
-use Database;
+use App\Core\Database;
 use Security;
 
 /**

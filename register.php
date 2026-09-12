@@ -1,16 +1,20 @@
 <?php
-// =========================================================================
-// REGISTER.PHP - Inscription robuste et sécurisée MAN GO
-// =========================================================================
-
 require_once __DIR__ . '/config/config.php';
-require_once __DIR__ . '/core/Session.php';
-require_once __DIR__ . '/core/Countries.php';
+require_once __DIR__ . '/core/Autoloader.php';
 
 Session::init();
 
-if (Session::get('user_id')) {
-    header('Location: dashboard.php');
+// Rediriger intelligemment si l'utilisateur est déjà connecté
+if (Session::isAuthenticated() || Session::get('user_id')) {
+    $role = Session::get('user_role');
+    
+    if ($role === 'vendor') {
+        header('Location: vendor_dir/dashboard.php');
+    } elseif ($role === 'admin') {
+        header('Location: admin/dashboard.php');
+    } else {
+        header('Location: client/views/dashboard.php');
+    }
     exit;
 }
 
@@ -18,18 +22,22 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $full_name = trim(filter_input(INPUT_POST, 'full_name', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
-    $email     = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL);
-    $password  = $_POST['password'] ?? '';
+    $role       = $_POST['role'] ?? 'buyer';
+    $full_name  = trim(filter_input(INPUT_POST, 'full_name', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
+    $email      = filter_input(INPUT_POST, 'email', FILTER_VALIDATE_EMAIL);
+    $password   = $_POST['password'] ?? '';
     $confirm_password = $_POST['confirm_password'] ?? '';
-    $dial_code = trim($_POST['dial_code'] ?? '+228');
-    $raw_phone = trim($_POST['phone'] ?? '');
-    $terms     = isset($_POST['terms']) ? true : false;
+    $dial_code  = trim($_POST['dial_code'] ?? '+228');
+    $raw_phone  = trim($_POST['phone'] ?? '');
+    $terms      = isset($_POST['terms']) ? true : false;
 
-    // Assemblage du téléphone international
+    // Validation du rôle autorisé
+    if (!in_array($role, ['buyer', 'vendor'])) {
+        $role = 'buyer';
+    }
+
     $phone = Countries::formatPhone($dial_code, $raw_phone);
 
-    // Validations strictes
     if (!$full_name || !$email || !$password || empty($raw_phone)) {
         $error = "Veuillez remplir tous les champs obligatoires.";
     } elseif ($password !== $confirm_password) {
@@ -37,12 +45,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$/', $password)) {
         $error = "Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.";
     } elseif (!$terms) {
-        $error = "Vous devez accepter les conditions d'utilisation et la règle de confidentialité.";
+        $error = "Vous devez accepter les conditions d'utilisation.";
     } else {
         $db = getDBConnection();
 
         try {
-            // Vérification unicité email ou téléphone
             $stmt = $db->prepare("SELECT id FROM users WHERE email = :email OR phone = :phone LIMIT 1");
             $stmt->execute([':email' => $email, ':phone' => $phone]);
 
@@ -51,15 +58,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $password_hash = password_hash($password, PASSWORD_DEFAULT);
 
-                // Insertion adaptée à la structure réelle de ta table users (firstname/lastname ou full_name selon ta BDD)
-                // On sépare le nom complet en prenom / nom si besoin, ou on adapte :
-                $name_parts = explode(' ', $full_name, 2);
-                $firstname = $name_parts[0] ?? $full_name;
+                $name_parts = explode(' ', $full_name, 2);                
+                $firstname = $name_parts[0] ?? $full_name;                
                 $lastname = $name_parts[1] ?? '';
 
+                // Définition de l'ID du rôle (par exemple 2 pour acheteur/vendeur ou selon votre table roles)
+                $roleId = ($role === 'vendor') ? 4 : 5; // Ajustez les IDs selon votre base roles
+
                 $stmtInsert = $db->prepare("
-                    INSERT INTO users (firstname, lastname, email, phone, password_hash, created_at)
-                    VALUES (:firstname, :lastname, :email, :phone, :password_hash, NOW())
+                    INSERT INTO users (firstname, lastname, email, phone, password_hash, role_id, created_at)
+                    VALUES (:firstname, :lastname, :email, :phone, :password_hash, :role_id, NOW())
                 ");
 
                 $stmtInsert->execute([
@@ -67,18 +75,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':lastname'      => $lastname,
                     ':email'         => $email,
                     ':phone'         => $phone,
-                    ':password_hash' => $password_hash
+                    ':password_hash' => $password_hash,
+                    ':role_id'       => $roleId
                 ]);
 
-                $userId = $db->lastInsertId();
-                Session::set('user_id', $userId);
-                Session::set('user_name', $full_name);
-
-                header('Location: dashboard.php?registered=1');
+                // Inscription réussie ! 
+                // On redirige vers la page de connexion pour afficher le message de succès
+                // L'utilisateur devra se connecter manuellement (meilleure pratique de sécurité)
+                header('Location: login.php?registered=1');
                 exit;
             }
         } catch (Exception $e) {
-            // Affichage propre de l'erreur SQL si une colonne diffère
             $error = "Erreur technique lors de l'inscription : " . $e->getMessage();
         }
     }
@@ -113,6 +120,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="text-center">
                 <h1 class="text-2xl font-black text-slate-900">Créer un compte</h1>
                 <p class="text-xs text-gray-500 mt-1">Rejoignez la communauté internationale MAN GO</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Type de compte</label>
+                <select name="role" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500">
+                    <option value="buyer">Acheteur</option>
+                    <option value="vendor">Vendeur / Propriétaire de stand</option>
+                </select>
             </div>
 
             <?php if (!empty($error)): ?>
