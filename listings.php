@@ -47,7 +47,7 @@ try {
 // =========================================================================
 // 4. CONSTRUCTION DE LA REQUÊTE SQL DYNAMIQUE (Le Moteur de Recherche)
 // =========================================================================
-$where = ["l.status = 'active'"];
+$where = ["l.status = 'ACTIVE'"];
 $params = [];
 
 if (!empty($search)) {

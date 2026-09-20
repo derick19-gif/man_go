@@ -18,7 +18,7 @@ class OrderController {
             FROM products p
             LEFT JOIN users u ON p.user_id = u.id
             LEFT JOIN categories c ON p.category_id = c.id
-            WHERE p.id = :id AND p.status = 'active'
+            WHERE p.id = :id AND p.status = 'ACTIVE'
             LIMIT 1
         ");
         $stmt->execute([':id' => $productId]);

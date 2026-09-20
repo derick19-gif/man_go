@@ -46,7 +46,7 @@ class Request
         $path = parse_url($uri, PHP_URL_PATH) ?? '/';
 
         // Nettoyage du préfixe sous-dossier (ex: /man_go)
-        $basePath = defined('BASE_URL_PATH') ? BASE_URL_PATH : '';
+        $basePath = defined('APP_URL_PATH') ? APP_URL_PATH : '';
         if (!empty($basePath) && str_starts_with($path, $basePath)) {
             $path = substr($path, strlen($basePath));
         }

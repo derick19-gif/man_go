@@ -34,7 +34,7 @@ require_once __DIR__ . '/../../app/views/layouts/header.php';
                                 <h4 class="font-bold text-slate-900"><?= htmlspecialchars($item['title']) ?></h4>
                                 <p class="text-amber-600 font-black text-lg mt-2"><?= number_format($item['price'], 0, ',', ' ') ?> <?= htmlspecialchars($item['currency'] ?? 'FCFA') ?></p>
                             </div>
-                            <a href="<?= (defined('BASE_URL') ? BASE_URL : '/man_go') ?>/listing-detail.php?id=<?= $item['id'] ?>" class="mt-4 w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-center text-sm block">Voir l'offre</a>
+                            <a href="<?= (defined('APP_URL') ? APP_URL : '/man_go') ?>/listing-detail.php?id=<?= $item['id'] ?>" class="mt-4 w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 rounded-xl text-center text-sm block">Voir l'offre</a>
                         </div>
                     </div>
                 <?php endforeach; ?>

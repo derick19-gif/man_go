@@ -84,13 +84,13 @@ class Response
     }
 
     /**
-     * Envoyé une redirection HTTP en s'assurant que le BASE_URL_PATH est respecté
+     * Envoyé une redirection HTTP en s'assurant que le APP_URL_PATH est respecté
      */
     public function redirect(string $url, int $statusCode = 302): void
     {
         // Ne préfixe pas les URLs absolues (ex: https://...)
         if (!preg_match('#^https?://#i', $url)) {
-            $basePath = defined('BASE_URL_PATH') ? BASE_URL_PATH : '/man_go';
+            $basePath = defined('APP_URL_PATH') ? APP_URL_PATH : '/man_go';
             if (!empty($basePath) && !str_starts_with($url, $basePath)) {
                 $url = $basePath . '/' . ltrim($url, '/');
             }

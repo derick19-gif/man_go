@@ -74,3 +74,69 @@ $dashboardLinkFooter = ($userRoleFooter === 'vendor') ? $baseUrl . '/vendor_dir/
         </div>
     </div>
 </footer>
+
+<!-- ========================================== -->
+<!-- BANDEAU COOKIES MAN GO (PREMIUM & LÉGAL)   -->
+<!-- ========================================== -->
+<div id="cookie-consent-banner" class="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-[480px] bg-slate-900 border border-slate-800 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-[9999] transform translate-y-[150%] opacity-0 transition-all duration-700 ease-[cubic-bezier(0.34,1.56,0.64,1)] hidden font-sans">
+    <div class="p-5">
+        <div class="flex items-start gap-4">
+            
+            <!-- Icône Bouclier (Plus pro qu'un cookie) -->
+            <div class="bg-amber-500/10 p-3 rounded-full flex items-center justify-center border border-amber-500/20 shrink-0 mt-1">
+                <i class="fa-solid fa-shield-halved text-amber-500 text-xl"></i>
+            </div>
+            
+            <div>
+                <h4 class="text-white font-black text-base mb-1.5 tracking-wide">Respect de votre vie privée</h4>
+                <p class="text-slate-400 text-xs sm:text-sm leading-relaxed mb-4">
+                    MAN GO utilise des traceurs pour assurer la sécurité de vos transactions (KYC) et améliorer votre expérience sur la marketplace. En continuant, vous acceptez notre politique.
+                </p>
+                
+                <div class="flex items-center gap-3 w-full justify-end">
+                    <a href="<?= $baseUrl ?>/terms.php" class="text-slate-400 hover:text-white text-xs font-semibold px-2 py-2 transition whitespace-nowrap">
+                        En savoir plus
+                    </a>
+                    <button onclick="acceptMangoCookies()" class="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black px-5 py-2.5 rounded-xl shadow-lg shadow-amber-500/20 transition-all text-sm flex items-center justify-center gap-2 hover:scale-105 active:scale-95">
+                        <span>J'accepte</span>
+                        <i class="fa-solid fa-check"></i>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const cookieBanner = document.getElementById('cookie-consent-banner');
+    
+    // Vérification du consentement
+    if (!localStorage.getItem('mango_cookies_accepted')) {
+        // Enlève la classe hidden pour rendre l'élément présent dans le DOM
+        cookieBanner.classList.remove('hidden');
+        
+        // Délai pour laisser le DOM se mettre à jour avant de lancer l'animation "rebond"
+        setTimeout(() => {
+            cookieBanner.classList.remove('translate-y-[150%]', 'opacity-0');
+        }, 300);
+    }
+});
+
+function acceptMangoCookies() {
+    const cookieBanner = document.getElementById('cookie-consent-banner');
+    
+    // Sauvegarde du choix
+    localStorage.setItem('mango_cookies_accepted', 'true');
+    
+    // Animation de sortie vers le bas
+    cookieBanner.classList.add('translate-y-[150%]', 'opacity-0');
+    
+    // Nettoyage final du DOM
+    setTimeout(() => {
+        cookieBanner.classList.add('hidden');
+    }, 700);
+}
+</script>
+<!-- ========================================== -->

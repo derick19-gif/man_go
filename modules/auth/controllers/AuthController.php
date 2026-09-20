@@ -84,8 +84,68 @@ class AuthController extends Controller
             $this->redirect(APP_URL . '/register');
         }
 
-        Session::flash('message', 'Compte créé avec succès. Vous pouvez vous connecter.');
-        $this->redirect(APP_URL . '/login');
+        // --- 1. DÉTECTION SILENCIEUSE DU VPN (SANS BLOQUER L'UTILISATEUR) ---
+        $userIp = $this->request->getIp();
+        $isVpnUser = 0;
+
+        if ($userIp && $userIp !== '127.0.0.1' && $userIp !== '::1') {
+            $apiUrl = "https://proxycheck.io/v2/{$userIp}?vpn=1&asn=1";
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $apiUrl);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 2); // 2 secondes max pour ne pas ralentir
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode === 200 && $response) {
+                $data = json_decode($response, true);
+                if (isset($data[$userIp]['proxy']) && $data[$userIp]['proxy'] === 'yes') {
+                    $isVpnUser = 1; // On note secrètement qu'il utilise un VPN
+                }
+            }
+        }
+        // --- FIN DE LA DÉTECTION VPN ---
+
+        // Séparation du nom en first_name et last_name pour correspondre au Model User
+        $nameParts = explode(' ', $name, 2);
+        $firstName = $nameParts[0] ?? '';
+        $lastName = $nameParts[1] ?? '';
+
+        $userData = [
+            'first_name'     => $firstName,
+            'last_name'      => $lastName,
+            'email'          => $email,
+            'password_hash'  => $password, // Sera haché par le modèle User
+            'phone'          => $phone,
+            'is_active'      => 1,
+            'is_verified'    => 0,
+            // Les données secrètes VPN et IP injectées silencieusement :
+            'registration_ip'=> $userIp,
+            'is_vpn'         => $isVpnUser
+        ];
+
+        try {
+            $userModel = new User();
+            
+            // Note : Il faudra s'assurer que votre méthode create() dans User.php accepte ces 2 champs, 
+            // ou bien ils seront ignorés s'ils ne sont pas gérés. 
+            // Voyons l'insertion :
+            $success = $userModel->create($userData);
+
+            if ($success) {
+                Session::flash('message', 'Compte créé avec succès. Vous pouvez vous connecter.');
+                $this->redirect(APP_URL . '/login');
+            } else {
+                Session::flash('error', 'Erreur lors de la création du compte.');
+                $this->redirect(APP_URL . '/register');
+            }
+        } catch (\Exception $e) {
+            Session::flash('error', 'Cette adresse email est déjà utilisée ou une erreur est survenue.');
+            $this->redirect(APP_URL . '/register');
+        }
     }
 
     public function authenticateAction(): void
@@ -96,18 +156,18 @@ class AuthController extends Controller
 
         // Verify CSRF token
         $token = $this->request->post('_token') ?? $this->request->post('csrf_token');
-        if (!Security::verifyCsrfToken($token)) {
-            Security::logSecurityEvent('CSRF_FAILED', ['ip' => $this->request->getIp()]);
+        if (!\Security::verifyCsrfToken($token)) {
+            \Security::logSecurityEvent('CSRF_FAILED', ['ip' => $this->request->getIp()]);
             Session::flash('error', 'Session expired or invalid token. Please try again.');
             $this->redirect(APP_URL . '/login');
         }
 
         // Rate limiting
         $rateLimitKey = 'login_' . $this->request->getIp();
-        $rateLimit = Security::checkRateLimit($rateLimitKey, AUTH_ATTEMPTS_MAX, AUTH_LOCKOUT_TIME);
+        $rateLimit = \Security::checkRateLimit($rateLimitKey, AUTH_ATTEMPTS_MAX ?? 5, AUTH_LOCKOUT_TIME ?? 900);
 
         if (!$rateLimit['allowed']) {
-            Security::logSecurityEvent('LOGIN_RATE_LIMIT', [
+            \Security::logSecurityEvent('LOGIN_RATE_LIMIT', [
                 'ip'          => $this->request->getIp(),
                 'retry_after' => $rateLimit['retry_after'],
             ]);
@@ -121,7 +181,7 @@ class AuthController extends Controller
         $password = $this->request->post('password', '');
 
         if (empty($email) || empty($password)) {
-            Security::logSecurityEvent('LOGIN_EMPTY_CREDENTIALS', ['email' => $email, 'ip' => $this->request->getIp()]);
+            \Security::logSecurityEvent('LOGIN_EMPTY_CREDENTIALS', ['email' => $email, 'ip' => $this->request->getIp()]);
             Session::flash('error', 'Please enter your email/phone and password.');
             $this->redirect(APP_URL . '/login');
         }
@@ -130,7 +190,7 @@ class AuthController extends Controller
         $isPhone = preg_match('/^[0-9+\s\-]{8,15}$/', $email);
 
         if (!$isEmail && !$isPhone) {
-            Security::logSecurityEvent('LOGIN_INVALID_IDENTIFIER', ['email' => $email, 'ip' => $this->request->getIp()]);
+            \Security::logSecurityEvent('LOGIN_INVALID_IDENTIFIER', ['email' => $email, 'ip' => $this->request->getIp()]);
             Session::flash('error', 'Invalid email address or phone number.');
             $this->redirect(APP_URL . '/login');
         }
@@ -142,7 +202,7 @@ class AuthController extends Controller
             : $userModel->findByEmail($email);
 
         if (!$user || !$user->exists()) {
-            Security::logSecurityEvent('LOGIN_USER_NOT_FOUND', [
+            \Security::logSecurityEvent('LOGIN_USER_NOT_FOUND', [
                 'email' => $email,
                 'ip'    => $this->request->getIp(),
             ]);
@@ -153,7 +213,7 @@ class AuthController extends Controller
 
         // Check if user is active
         if (!$user->isActive()) {
-            Security::logSecurityEvent('LOGIN_USER_INACTIVE', [
+            \Security::logSecurityEvent('LOGIN_USER_INACTIVE', [
                 'user_id' => $user->getId(),
                 'email'   => $email,
                 'ip'      => $this->request->getIp(),
@@ -165,7 +225,7 @@ class AuthController extends Controller
 
         // Verify password
         if (!$user->verifyPassword($password)) {
-            Security::logSecurityEvent('LOGIN_WRONG_PASSWORD', [
+            \Security::logSecurityEvent('LOGIN_WRONG_PASSWORD', [
                 'user_id' => $user->getId(),
                 'email'   => $email,
                 'ip'      => $this->request->getIp(),
@@ -195,7 +255,7 @@ class AuthController extends Controller
 
         Session::create($sessionData);
 
-        Security::logSecurityEvent('LOGIN_SUCCESS', [
+        \Security::logSecurityEvent('LOGIN_SUCCESS', [
             'user_id' => $user->getId(),
             'email'   => $email,
             'ip'      => $this->request->getIp(),

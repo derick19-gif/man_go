@@ -13,7 +13,7 @@ class DashboardController {
 
         // Sécurité : Redirection vers la connexion si non authentifié
         if (!Session::get('user_id')) {
-            header('Location: ' . BASE_URL . '/login.php');
+            header('Location: ' . APP_URL . '/login.php');
             exit;
         }
 
@@ -22,10 +22,10 @@ class DashboardController {
 
         // 2. Redirection selon les rôles (Niveaux 2 et 3)[cite: 1]
         if ($role === 'admin') {
-            header('Location: ' . BASE_URL . '/admin/dashboard.php');
+            header('Location: ' . APP_URL . '/admin/dashboard.php');
             exit;
         } elseif ($role === 'vendor' || $role === 'vendeur') {
-            header('Location: ' . BASE_URL . '/vendor_dir/dashboard.php');
+            header('Location: ' . APP_URL . '/vendor_dir/dashboard.php');
             exit;
         }
 
@@ -47,7 +47,7 @@ class DashboardController {
 
             if (!$user) {
                 session_destroy();
-                header('Location: ' . BASE_URL . '/login.php');
+                header('Location: ' . APP_URL . '/login.php');
                 exit;
             }
 
@@ -55,7 +55,7 @@ class DashboardController {
             $stmtStats = $pdo->prepare("
                 SELECT 
                     COUNT(id) AS total_listings,
-                    COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) AS active_listings,
+                    COALESCE(SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END), 0) AS active_listings,
                     COALESCE(SUM(views_count), 0) AS total_views
                 FROM listings 
                 WHERE user_id = :id
@@ -87,7 +87,7 @@ class DashboardController {
             $stmtstands = $pdo->prepare("
                 SELECT id, name, logo, banner, status 
                 FROM stands 
-                WHERE status = 'active' 
+                WHERE status = 'ACTIVE' 
                 ORDER BY RAND() 
                 LIMIT 8
             ");
@@ -116,3 +116,4 @@ class DashboardController {
         require_once __DIR__ . '/../../client/views/dashboard.php';
     }
 }
+

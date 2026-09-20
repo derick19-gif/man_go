@@ -1,7 +1,7 @@
 <?php
 // modules/stands/views/index.php
 
-$baseUrl = defined('BASE_URL') ? BASE_URL : '';
+$baseUrl = defined('APP_URL') ? APP_URL : '';
 require_once __DIR__ . '/../../../themes/default/templates/layouts/header.php';
 ?>
 

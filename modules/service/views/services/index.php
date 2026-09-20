@@ -32,18 +32,18 @@ $services = $services ?? [];
     <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <a href="<?= BASE_URL ?>/" class="text-2xl font-black tracking-wider flex items-center space-x-2">
+                <a href="<?= APP_URL ?>/" class="text-2xl font-black tracking-wider flex items-center space-x-2">
                     <span class="text-orange-500">MAN</span><span>GO</span>
                 </a>
             </div>
             <nav class="hidden md:flex items-center space-x-6 text-sm font-medium">
-                <a href="<?= BASE_URL ?>/" class="hover:text-orange-400 transition">Accueil</a>
-                <a href="<?= BASE_URL ?>/listings" class="hover:text-orange-400 transition">Annonces</a>
-                <a href="<?= BASE_URL ?>/stands" class="hover:text-orange-400 transition">Boutiques & Stands</a>
-                <a href="<?= BASE_URL ?>/services" class="text-orange-400 font-semibold">Services</a>
+                <a href="<?= APP_URL ?>/" class="hover:text-orange-400 transition">Accueil</a>
+                <a href="<?= APP_URL ?>/listings" class="hover:text-orange-400 transition">Annonces</a>
+                <a href="<?= APP_URL ?>/stands" class="hover:text-orange-400 transition">Boutiques & Stands</a>
+                <a href="<?= APP_URL ?>/services" class="text-orange-400 font-semibold">Services</a>
             </nav>
             <div>
-                <a href="<?= BASE_URL ?>/login.php" class="mango-gradient text-white px-5 py-2.5 rounded-full font-medium shadow-lg hover:opacity-90 transition">
+                <a href="<?= APP_URL ?>/login.php" class="mango-gradient text-white px-5 py-2.5 rounded-full font-medium shadow-lg hover:opacity-90 transition">
                     Espace Membre
                 </a>
             </div>
@@ -69,7 +69,7 @@ $services = $services ?? [];
                         <div>
                             <div class="h-48 bg-slate-200 relative overflow-hidden">
                                 <?php if (!empty($service['image'])): ?>
-                                    <img src="<?= BASE_URL ?>/uploads/services/<?= htmlspecialchars($service['image']) ?>" alt="<?= htmlspecialchars($service['title']) ?>" class="w-full h-full object-cover">
+                                    <img src="<?= APP_URL ?>/uploads/services/<?= htmlspecialchars($service['image']) ?>" alt="<?= htmlspecialchars($service['title']) ?>" class="w-full h-full object-cover">
                                 <?php else: ?>
                                     <div class="w-full h-full flex items-center justify-center text-slate-400 bg-slate-100">
                                         <i class="fas fa-concierge-bell fa-3x"></i>
@@ -92,7 +92,7 @@ $services = $services ?? [];
                             <span class="text-orange-600 font-bold text-lg">
                                 <?= !empty($service['price']) ? number_format($service['price'], 0, ',', ' ') . ' XOF' : 'Sur devis' ?>
                             </span>
-                            <a href="<?= BASE_URL ?>/services/detail?id=<?= $service['id'] ?>" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-800 transition">
+                            <a href="<?= APP_URL ?>/services/detail?id=<?= $service['id'] ?>" class="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-slate-800 transition">
                                 Voir détails
                             </a>
                         </div>

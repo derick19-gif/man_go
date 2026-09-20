@@ -114,14 +114,14 @@ class Router
     }
 
     /**
-     * Normalise l'URL courante en retirant les query params et le prefix BASE_URL_PATH
+     * Normalise l'URL courante en retirant les query params et le prefix APP_URL_PATH
      */
     private function normalizePath(string $path): string
     {
         // Nettoyer les query params
         $path = parse_url($path, PHP_URL_PATH) ?? '/';
         
-        $basePath = defined('BASE_URL_PATH') ? BASE_URL_PATH : '/man_go';
+        $basePath = defined('APP_URL_PATH') ? APP_URL_PATH : '/man_go';
         
         // Si le chemin commence par le base path, on le retire
         if (!empty($basePath) && stripos($path, $basePath) === 0) {

@@ -51,7 +51,7 @@ try {
     $sql = "SELECT id, title, slug, price, main_image AS image, category_id, 'produit' as type 
             FROM products 
             WHERE (title LIKE :searchTerm OR description LIKE :searchTerm) 
-            AND status = 'active'
+            AND status = 'ACTIVE'
             LIMIT 6";
 
     $stmt = $pdo->prepare($sql);

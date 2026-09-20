@@ -21,7 +21,7 @@ if (file_exists(__DIR__ . '/core/Request.php')) {
 }
 
 echo "<h2>1. Vérification des Constantes</h2>";
-echo "BASE_URL_PATH : " . (defined('BASE_URL_PATH') ? BASE_URL_PATH : '<span style="color:red">NON DÉFINI</span>') . "<br>";
+echo "APP_URL_PATH : " . (defined('APP_URL_PATH') ? APP_URL_PATH : '<span style="color:red">NON DÉFINI</span>') . "<br>";
 echo "APP_PATH : " . (defined('APP_PATH') ? APP_PATH : '<span style="color:red">NON DÉFINI</span>') . "<br>";
 
 echo "<h2>2. Test d'Existence des Contrôleurs</h2>";

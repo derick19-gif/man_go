@@ -163,30 +163,34 @@ class User
         try {
             $this->db->beginTransaction();
 
+            // 1. La requête SQL modifiée avec registration_ip et is_vpn
             $stmt = $this->db->prepare("
                 INSERT INTO users (
                     uuid, first_name, last_name, email, password_hash, phone,
                     country_id, locale_id, currency_id, timezone_id,
-                    is_active, is_verified, created_at, updated_at
+                    is_active, is_verified, registration_ip, is_vpn, created_at, updated_at
                 ) VALUES (
                     UUID(), :first_name, :last_name, :email, :password_hash, :phone,
                     :country_id, :locale_id, :currency_id, :timezone_id,
-                    :is_active, :is_verified, NOW(), NOW()
+                    :is_active, :is_verified, :registration_ip, :is_vpn, NOW(), NOW()
                 )
             ");
 
+            // 2. L'exécution avec les deux nouvelles valeurs ajoutées à la fin
             $stmt->execute([
-                ':first_name' => $data['first_name'] ?? null,
-                ':last_name' => $data['last_name'] ?? null,
-                ':email' => $data['email'],
-                ':password_hash' => Security::hashPassword($data['password_hash']),
-                ':phone' => $data['phone'] ?? null,
-                ':country_id' => $data['country_id'] ?? null,
-                ':locale_id' => $data['locale_id'] ?? null,
-                ':currency_id' => $data['currency_id'] ?? null,
-                ':timezone_id' => $data['timezone_id'] ?? null,
-                ':is_active' => $data['is_active'] ?? 1,
-                ':is_verified' => $data['is_verified'] ?? 0,
+                ':first_name'      => $data['first_name'] ?? null,
+                ':last_name'       => $data['last_name'] ?? null,
+                ':email'           => $data['email'],
+                ':password_hash'   => Security::hashPassword($data['password_hash']),
+                ':phone'           => $data['phone'] ?? null,
+                ':country_id'      => $data['country_id'] ?? null,
+                ':locale_id'       => $data['locale_id'] ?? null,
+                ':currency_id'     => $data['currency_id'] ?? null,
+                ':timezone_id'     => $data['timezone_id'] ?? null,
+                ':is_active'       => $data['is_active'] ?? 1,
+                ':is_verified'     => $data['is_verified'] ?? 0,
+                ':registration_ip' => $data['registration_ip'] ?? null, // NOUVEAU
+                ':is_vpn'          => $data['is_vpn'] ?? 0              // NOUVEAU
             ]);
 
             $userId = $this->db->lastInsertId();

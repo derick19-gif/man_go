@@ -127,7 +127,7 @@ try {
 }
 
 $pageTitle = "Tableau de bord dynamique - MAN GO";
-$baseUrl = defined('BASE_URL') ? BASE_URL : '/man_go';
+$baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
 ?>
 <!DOCTYPE html>
 <html lang="fr">

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../core/Autoloader.php';
+require_once __DIR__ . '/../core/Database.php';
 
 // Initialisation de la session
 Session::init();
@@ -21,6 +22,27 @@ $current_user_id = Session::getUserId();
 $currency = $_SESSION['user_currency'] ?? 'FCFA';
 $userName = Session::get('user_name') ?? 'Vendeur';
 $userId = Session::get('user_id') ?? $current_user_id;
+
+// =====================================================================
+// Récupération des annonces du vendeur depuis la base de données
+// =====================================================================
+$myListings = [];
+try {
+    $db = \App\Core\Database::connect();
+    $stmt = $db->prepare("SELECT * FROM listings WHERE user_id = :user_id ORDER BY created_at DESC");
+    $stmt->execute([':user_id' => $userId]);
+    $myListings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $myListings = []; 
+}
+
+$categoryNames = [
+    1 => 'Électronique & High-Tech',
+    2 => 'Services & Prestations',
+    3 => 'Immobilier & Foncier',
+    4 => 'Mode & Style',
+    5 => 'Véhicules & Transports'
+];
 ?>
 
 <!DOCTYPE html>
@@ -29,458 +51,691 @@ $userId = Session::get('user_id') ?? $current_user_id;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Espace Vendeur & Prestataire - MAN GO</title>
-    <!-- Bootstrap 5 & FontAwesome -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --mango-orange: #f59e0b; /* Amber 500 */
-            --mango-orange-dark: #d97706; /* Amber 600 */
-            --mango-dark: #0f172a; /* Slate 900 */
-            --mango-bg: #f8fafc;
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: { brand: { 500: '#f59e0b', 600: '#d97706', 950: '#090d16' } },
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+                }
+            }
         }
-        body { 
-            background-color: var(--mango-bg); 
-            font-family: 'Plus Jakarta Sans', sans-serif; 
-            color: #334155;
-        }
-        
-        /* Sidebar Styling */
-        .sidebar { 
-            background: #ffffff; 
-            border-right: 1px solid #e2e8f0; 
-            min-height: 100vh; 
-            position: sticky;
-            top: 0;
-        }
-        .nav-pills .nav-link {
-            color: #64748b;
-            border-radius: 10px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-        .nav-pills .nav-link:hover {
-            background-color: #f1f5f9;
-            color: var(--mango-dark);
-            transform: translateX(5px);
-        }
-        .nav-pills .nav-link.active {
-            background: linear-gradient(135deg, var(--mango-orange), var(--mango-orange-dark));
-            color: #ffffff;
-            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
-            transform: translateX(5px);
-        }
-
-        /* Cards & UI Elements */
-        .stat-card { 
-            background: #ffffff; 
-            border-radius: 16px; 
-            border: 1px solid #e2e8f0; 
-            padding: 24px; 
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-        }
-        .stat-icon { 
-            width: 54px; 
-            height: 54px; 
-            border-radius: 14px; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            font-size: 1.5rem; 
-        }
-        .btn-mango {
-            background: linear-gradient(135deg, var(--mango-orange), var(--mango-orange-dark));
-            color: white;
-            border: none;
-            transition: all 0.3s ease;
-        }
-        .btn-mango:hover {
-            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
-            color: white;
-            transform: translateY(-2px);
-        }
-        .card-custom {
-            border-radius: 16px;
-            border: 1px solid #e2e8f0;
-            background: #ffffff;
-        }
-    </style>
+    </script>
 </head>
-<body>
+<body class="bg-slate-50 font-sans text-slate-800 flex h-screen overflow-hidden relative">
 
-<div class="container-fluid">
-    <div class="row">
-        <!-- Sidebar Navbar -->
-        <div class="col-md-3 col-lg-2 sidebar p-4">
-            <div class="d-flex align-items-center mb-5">
-                <div class="bg-warning text-dark fw-black rounded-3 d-flex align-items-center justify-content-center me-2 shadow-sm" style="width: 40px; height: 40px; font-weight: 900; font-size: 1.2rem;">M</div>
-                <h5 class="fw-bold text-dark m-0">Espace <span class="text-warning">Pro</span></h5>
+    <!-- VOILE FONCÉ POUR MOBILE (Overlay) -->
+    <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden lg:hidden backdrop-blur-sm transition-opacity opacity-0"></div>
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 h-full flex flex-col p-6 transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none">
+        
+        <div class="flex items-center justify-between mb-10">
+            <div class="flex items-center">
+                <div class="bg-amber-400 text-slate-900 font-black rounded-lg flex items-center justify-center mr-3 shadow-sm" style="width: 40px; height: 40px; font-size: 1.2rem;">M</div>
+                <h2 class="font-extrabold text-slate-900 text-xl m-0">Espace <span class="text-amber-500">Pro</span></h2>
             </div>
-            
-            <div class="nav flex-column nav-pills gap-2" id="v-pills-tab" role="tablist">
-                <button class="nav-link active text-start" id="tab-stats-btn" data-bs-toggle="pill" data-bs-target="#tab-stats"><i class="fa-solid fa-chart-line me-2 w-20px"></i> Statistiques</button>
-                
-                <!-- NOUVEAUX ONGLETS -->
-                <button class="nav-link text-start" id="tab-listings-btn" data-bs-toggle="pill" data-bs-target="#tab-listings"><i class="fa-solid fa-box-open me-2 w-20px"></i> Mes Annonces</button>
-                <button class="nav-link text-start" id="tab-publish-btn" data-bs-toggle="pill" data-bs-target="#tab-publish"><i class="fa-solid fa-plus-circle me-2 w-20px"></i> Publier</button>
-                
-                <hr class="my-2 text-muted">
-                
-                <button class="nav-link text-start" id="tab-settings-btn" data-bs-toggle="pill" data-bs-target="#tab-settings"><i class="fa-solid fa-robot me-2 w-20px"></i> Rép. Auto & Absence</button>
-                <button class="nav-link text-start" id="tab-quick-btn" data-bs-toggle="pill" data-bs-target="#tab-quick"><i class="fa-solid fa-bolt me-2 w-20px"></i> Réponses Rapides</button>
-                
-                <a href="../index.php" class="btn btn-outline-dark mt-5 fw-bold rounded-pill"><i class="fa-solid fa-arrow-left me-2"></i> Retour au site</a>
-            </div>
+            <button onclick="toggleSidebar()" class="lg:hidden text-slate-400 hover:text-red-500 text-2xl transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
         </div>
+        
+        <nav class="flex flex-col gap-2 flex-1">
+            <button onclick="switchTab('tab-stats')" id="tab-stats-btn" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold transition-all bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md">
+                <i class="fa-solid fa-chart-line w-6 text-center mr-2"></i> Statistiques
+            </button>
+            <button onclick="switchTab('tab-listings')" id="tab-listings-btn" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">
+                <i class="fa-solid fa-box-open w-6 text-center mr-2"></i> Mes Annonces
+            </button>
+            <button onclick="switchTab('tab-publish')" id="tab-publish-btn" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">
+                <i class="fa-solid fa-plus-circle w-6 text-center mr-2"></i> Publier
+            </button>
 
-        <!-- Content Area -->
-        <div class="col-md-9 col-lg-10 p-4 p-lg-5">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h3 class="fw-extrabold m-0 text-dark">Bonjour, <?= htmlspecialchars($userName) ?> 👋</h3>
-                <span class="badge bg-dark text-warning px-3 py-2 rounded-pill fs-6"><i class="fa-solid fa-store me-1"></i> Compte Vendeur</span>
+            <!-- NOUVEAU BOUTON : MA BOUTIQUE -->
+            <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/stands/create" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">
+                <i class="fa-solid fa-store w-6 text-center mr-2"></i> Ma Boutique / Stand
+            </a>
+            
+            <hr class="border-slate-200 my-4">
+            
+            <button onclick="switchTab('tab-settings')" id="tab-settings-btn" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">
+                <i class="fa-solid fa-robot w-6 text-center mr-2"></i> Rép. Auto
+            </button>
+            <button onclick="switchTab('tab-quick')" id="tab-quick-btn" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">
+                <i class="fa-solid fa-bolt w-6 text-center mr-2"></i> Raccourcis
+            </button>
+
+            <!-- NOUVEAU BOUTON : PARAMÈTRES (Verrouillage profil, infos, etc.) -->
+            <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/settings" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-auto">
+                <i class="fa-solid fa-user-gear w-6 text-center mr-2"></i> Paramètres
+            </a>
+        </nav>
+
+        <div class="mt-4 pt-4 border-t border-slate-200">
+            <a href="../index.php" class="w-full flex items-center justify-center px-4 py-3 border-2 border-slate-900 text-slate-900 rounded-full font-bold hover:bg-slate-900 hover:text-white transition-all">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Retour au site
+            </a>
+        </div>
+    </aside>
+
+    <!-- ZONE DE CONTENU PRINCIPAL -->
+    <div class="flex-1 flex flex-col h-full overflow-hidden">
+        
+        <!-- HEADER MOBILE -->
+        <header class="lg:hidden bg-white border-b border-slate-200 h-16 flex items-center justify-between px-4 shrink-0 shadow-sm">
+            <div class="flex items-center">
+                <div class="bg-slate-900 text-white font-black rounded w-8 h-8 flex items-center justify-center mr-2">M</div>
+                <span class="font-extrabold text-slate-900">MAN <span class="text-amber-500">GO</span></span>
             </div>
+            <button onclick="toggleSidebar()" class="text-slate-600 hover:text-amber-500 text-2xl p-2 focus:outline-none transition">
+                <i class="fa-solid fa-bars"></i>
+            </button>
+        </header>
 
-            <div class="tab-content" id="v-pills-tabContent">
+        <!-- CONTENU DU DASHBOARD -->
+        <main class="flex-1 overflow-y-auto p-4 sm:p-8 lg:p-10">
+            <header class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8 gap-4">
+                <h3 class="font-extrabold text-2xl text-slate-900 m-0">Bonjour, <?= htmlspecialchars($userName) ?> 👋</h3>
+                <span class="bg-slate-900 text-amber-500 px-4 py-2 rounded-full text-sm font-bold shadow-sm self-start sm:self-auto">
+                    <i class="fa-solid fa-store mr-1"></i> Compte Vendeur
+                </span>
+            </header>
+
+            <!-- TAB 1: STATISTIQUES -->
+            <div id="tab-stats" class="tab-pane">
                 
-                <!-- TAB 1: STATISTIQUES -->
-                <div class="tab-pane fade show active" id="tab-stats">
-                    <h5 class="fw-bold mb-4 text-muted">Aperçu des performances</h5>
-                    <div class="row g-4" id="statsContainer">
-                        <div class="text-center py-5">
-                            <div class="spinner-border text-warning" role="status"></div>
-                            <p class="mt-3 text-muted">Chargement de vos données...</p>
+                <?php
+                // =====================================================================
+                // ⚙️ RÉCUPÉRATION DES VRAIES DONNÉES DEPUIS LA BASE DE DONNÉES
+                // =====================================================================
+                
+                try {
+                    $dbInstance = \App\Core\Database::getInstance();
+                    $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
+                    
+                    // On récupère l'ID de l'utilisateur connecté
+                    $currentUserId = class_exists('Session') ? \Session::getUserId() : ($_SESSION['user_id'] ?? 0);
+
+                    // 1. Trouver le stand de cet utilisateur et vérifier s'il a payé le Premium
+                    $stmtStand = $db->prepare("SELECT id, is_premium FROM stands WHERE user_id = ? LIMIT 1");
+                    $stmtStand->execute([$currentUserId]);
+                    $myStand = $stmtStand->fetch(PDO::FETCH_ASSOC);
+
+                    $standId = $myStand ? $myStand['id'] : 0;
+                    $isPremium = $myStand ? (bool)$myStand['is_premium'] : false;
+
+                    // 2. Vraies Vues Totales
+                    $stmtViews = $db->prepare("SELECT COUNT(*) FROM ad_views WHERE stand_id = ?");
+                    $stmtViews->execute([$standId]);
+                    $stats_views = $stmtViews->fetchColumn() ?: 0;
+                    
+                    // Simulation d'une croissance à 0% pour le moment
+                    $stats_views_growth = 0;  
+                    
+                    // 3. Vrais Clics (Si vous n'avez pas encore de table pour les clics, on met à 0)
+                    $stats_clicks = 0;
+                    $stats_clicks_growth = 0;  
+                    
+                    // Taux d'intérêt calculé mathématiquement
+                    $stats_rate = ($stats_views > 0) ? round(($stats_clicks / $stats_views) * 100, 1) : 0;
+
+                    // 4. Vrais Abonnés (Followers)
+                    $stmtFollowers = $db->prepare("SELECT COUNT(*) FROM followers WHERE stand_id = ?");
+                    $stmtFollowers->execute([$standId]);
+                    $stats_followers = $stmtFollowers->fetchColumn() ?: 0;
+                    
+                    // 5. Vraie Géolocalisation
+                    $stmtGeo = $db->prepare("
+                        SELECT CONCAT(country, ' (', city, ')') as name, COUNT(*) as total 
+                        FROM ad_views 
+                        WHERE stand_id = ? AND country != 'Inconnu'
+                        GROUP BY country, city 
+                        ORDER BY total DESC 
+                        LIMIT 3
+                    ");
+                    $stmtGeo->execute([$standId]);
+                    $geoData = $stmtGeo->fetchAll(PDO::FETCH_ASSOC);
+
+                    $stats_locations = [];
+                    $colors = ['bg-blue-500', 'bg-blue-400', 'bg-blue-300'];
+                    $i = 0;
+                    
+                    if (count($geoData) > 0) {
+                        foreach($geoData as $geo) {
+                            $percent = ($stats_views > 0) ? round(($geo['total'] / $stats_views) * 100) : 0;
+                            $stats_locations[] = [
+                                'name' => $geo['name'],
+                                'percent' => $percent,
+                                'color' => $colors[$i] ?? 'bg-slate-300'
+                            ];
+                            $i++;
+                        }
+                    } else {
+                        // S'il n'a pas encore de visites, on affiche un message vide
+                        $stats_locations[] = ['name' => 'En attente de visiteurs...', 'percent' => 0, 'color' => 'bg-slate-200'];
+                    }
+
+                } catch (Exception $e) {
+                    // Sécurité anti-crash au cas où la base de données met du temps à se mettre à jour
+                    $isPremium = false;
+                    $stats_views = $stats_clicks = $stats_rate = $stats_followers = 0;
+                    $stats_views_growth = $stats_clicks_growth = 0;
+                    $stats_locations = [['name' => 'Données indisponibles', 'percent' => 0, 'color' => 'bg-slate-200']];
+                }
+                ?>
+
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 mt-2 gap-4">
+                    <div>
+                        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Performances du Stand</h1>
+                        <p class="text-sm text-slate-500 mt-1">Analysez l'impact de vos annonces sur les 30 derniers jours.</p>
+                    </div>
+                    
+                    <?php if (!$isPremium): ?>
+                        <a href="upgrade.php" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg transition-all hover:-translate-y-0.5">
+                            <i class="fa-solid fa-crown text-amber-500"></i> Passer en Premium
+                        </a>
+                    <?php else: ?>
+                        <span class="inline-flex items-center gap-2 bg-amber-100 text-amber-700 px-4 py-2.5 rounded-xl font-black text-sm border border-amber-200">
+                            <i class="fa-solid fa-crown"></i> Compte PRO Actif
+                        </span>
+                    <?php endif; ?>
+                </div>
+
+                <!-- ================================================== -->
+                <!-- SECTION 1 : STATISTIQUES GRATUITES -->
+                <!-- ================================================== -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-semibold text-slate-500 mb-1">Vues Totales</p>
+                                <h3 class="text-3xl font-black text-slate-900"><?= number_format($stats_views, 0, ',', ' ') ?></h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-eye"></i>
+                            </div>
                         </div>
+                        <p class="text-xs font-medium text-emerald-500 mt-4 flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-trend-up"></i> +<?= $stats_views_growth ?>% cette semaine
+                        </p>
+                    </div>
+
+                    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-semibold text-slate-500 mb-1">Clics sur Annonces</p>
+                                <h3 class="text-3xl font-black text-slate-900"><?= number_format($stats_clicks, 0, ',', ' ') ?></h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-hand-pointer"></i>
+                            </div>
+                        </div>
+                        <p class="text-xs font-medium text-emerald-500 mt-4 flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-trend-up"></i> +<?= $stats_clicks_growth ?>% cette semaine
+                        </p>
+                    </div>
+
+                    <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-semibold text-slate-500 mb-1">Taux d'intérêt</p>
+                                <h3 class="text-3xl font-black text-slate-900"><?= $stats_rate ?>%</h3>
+                            </div>
+                            <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-bolt"></i>
+                            </div>
+                        </div>
+                        <p class="text-xs font-medium text-slate-400 mt-4">
+                            Ratio clics / vues
+                        </p>
                     </div>
                 </div>
 
-                <!-- TAB 2: MES ANNONCES (NOUVEAU) -->
-                <div class="tab-pane fade" id="tab-listings">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h4 class="fw-bold m-0">Gestion de mes annonces</h4>
-                        <button class="btn btn-mango fw-bold rounded-pill px-4" onclick="document.getElementById('tab-publish-btn').click()">
-                            <i class="fa-solid fa-plus me-1"></i> Créer
-                        </button>
+                <!-- ================================================== -->
+                <!-- SECTION 2 : STATISTIQUES PREMIUM -->
+                <!-- ================================================== -->
+                <h2 class="text-lg font-black text-slate-900 mb-4">Analyses Avancées & Audience</h2>
+                
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
+                    
+                    <?php if (!$isPremium): ?>
+                        <div class="absolute inset-0 z-10 bg-slate-50/60 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center border border-white/50">
+                            <div class="bg-slate-900 p-8 rounded-3xl shadow-2xl text-center max-w-sm border border-slate-800 transform transition hover:scale-105 m-4">
+                                <div class="w-16 h-16 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
+                                    <i class="fa-solid fa-lock text-white text-2xl"></i>
+                                </div>
+                                <h3 class="text-xl font-black text-white mb-2">Passez en mode PRO</h3>
+                                <p class="text-slate-400 text-sm mb-6 leading-relaxed">Débloquez la géolocalisation de vos clients, activez le bouton "Suivre" et bâtissez votre communauté.</p>
+                                <a href="upgrade.php" class="block w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl transition shadow-[0_0_15px_rgba(245,158,11,0.4)]">
+                                    Voir les abonnements
+                                </a>
+                            </div>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm <?= !$isPremium ? 'opacity-50' : '' ?>">
+                        <div class="flex items-center gap-3 mb-6">
+                            <i class="fa-solid fa-earth-africa text-slate-400 text-xl"></i>
+                            <h3 class="font-bold text-slate-800">Origine de vos visiteurs</h3>
+                        </div>
+                        <div class="space-y-4">
+                            <?php foreach ($stats_locations as $location): ?>
+                                <div>
+                                    <div class="flex justify-between text-sm mb-1">
+                                        <span class="font-semibold text-slate-700"><?= htmlspecialchars($location['name']) ?></span>
+                                        <span class="text-slate-500"><?= $location['percent'] ?>%</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2">
+                                        <div class="<?= $location['color'] ?> h-2 rounded-full" style="width: <?= $location['percent'] ?>%"></div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
                     </div>
 
-                    <div class="card card-custom overflow-hidden shadow-sm">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
+                    <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm flex flex-col items-center justify-center text-center <?= !$isPremium ? 'opacity-50' : '' ?>">
+                        <div class="w-20 h-20 rounded-full bg-orange-50 flex items-center justify-center mb-4">
+                            <i class="fa-solid fa-users text-3xl text-orange-500"></i>
+                        </div>
+                        <h3 class="text-4xl font-black text-slate-900 mb-2"><?= number_format($stats_followers, 0, ',', ' ') ?></h3>
+                        <p class="font-bold text-slate-800 mb-1">Abonnés actifs</p>
+                        <p class="text-sm text-slate-500 px-4">Ces clients reçoivent une notification à chaque fois que vous publiez un produit.</p>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- TAB 2: MES ANNONCES -->
+            <div id="tab-listings" class="tab-pane hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h4 class="font-bold text-xl m-0 text-slate-900">Gestion de mes annonces</h4>
+                    <button onclick="switchTab('tab-publish')" class="bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-2 px-6 rounded-full hover:shadow-lg transition transform hover:-translate-y-0.5 text-sm">
+                        <i class="fa-solid fa-plus mr-1"></i> Créer
+                    </button>
+                </div>
+                
+                <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm whitespace-nowrap">
+                            <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                                <tr>
+                                    <th class="py-4 px-6">Produit / Service</th>
+                                    <th class="py-4 px-6">Catégorie</th>
+                                    <th class="py-4 px-6">Prix</th>
+                                    <th class="py-4 px-6">Statut</th>
+                                    <th class="py-4 px-6 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                
+                                <?php if (empty($myListings)): ?>
                                     <tr>
-                                        <th class="py-3 px-4">Produit / Service</th>
-                                        <th>Catégorie</th>
-                                        <th>Prix</th>
-                                        <th>Statut</th>
-                                        <th>Vues</th>
-                                        <th class="text-end px-4">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="vendorListingsTable">
-                                    <!-- Placeholder en attendant l'API -->
-                                    <tr>
-                                        <td colspan="6" class="text-center text-muted py-5">
-                                            <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
-                                                <i class="fa-solid fa-box-open fs-1 text-secondary"></i>
+                                        <td colspan="5" class="text-center py-16">
+                                            <div class="bg-slate-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
+                                                <i class="fa-solid fa-box-open text-3xl text-slate-400"></i>
                                             </div>
-                                            <h5 class="fw-bold text-dark">Votre vitrine est vide</h5>
-                                            <p>Commencez à vendre en publiant votre première annonce.</p>
-                                            <button class="btn btn-outline-dark rounded-pill mt-2" onclick="document.getElementById('tab-publish-btn').click()">Publier maintenant</button>
+                                            <h5 class="font-bold text-lg text-slate-900">Votre vitrine est vide</h5>
+                                            <p class="text-slate-500 mt-1 mb-4">Commencez à vendre en publiant votre première annonce.</p>
+                                            <button onclick="switchTab('tab-publish')" class="border-2 border-slate-900 text-slate-900 font-bold py-2 px-6 rounded-full hover:bg-slate-900 hover:text-white transition">Publier maintenant</button>
                                         </td>
                                     </tr>
-                                </tbody>
-                            </table>
-                        </div>
+                                <?php else: ?>
+                                    <?php foreach ($myListings as $listing): ?>
+                                        <tr class="hover:bg-slate-50 transition">
+                                            <td class="py-4 px-6 flex items-center">
+                                                <?php if (!empty($listing['image_path'])): ?>
+                                                    <img src="../<?= htmlspecialchars($listing['image_path']) ?>" class="w-12 h-12 rounded-lg object-cover mr-4 shadow-sm">
+                                                <?php else: ?>
+                                                    <div class="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center mr-4 text-slate-400 shadow-sm"><i class="fa-solid fa-camera"></i></div>
+                                                <?php endif; ?>
+                                                <span class="font-bold text-slate-900 truncate max-w-[200px]"><?= htmlspecialchars($listing['title']) ?></span>
+                                            </td>
+                                            <td class="py-4 px-6 text-slate-500 font-medium">
+                                                <?= $categoryNames[$listing['category_id']] ?? 'Général' ?>
+                                            </td>
+                                            <td class="py-4 px-6 font-black text-amber-600">
+                                                <?= number_format($listing['price'], 0, ',', ' ') ?> <?= $currency ?>
+                                            </td>
+                                            <td class="py-4 px-6">
+                                                <span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">Actif</span>
+                                            </td>
+                                            <td class="py-4 px-6 text-right">
+                                                <button class="text-slate-400 hover:text-blue-500 p-2 transition" title="Modifier"><i class="fa-solid fa-pen"></i></button>
+                                                <button class="text-slate-400 hover:text-red-500 p-2 transition" title="Supprimer"><i class="fa-solid fa-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+
+                            </tbody>
+                        </table>
                     </div>
                 </div>
-
-                <!-- TAB 3: PUBLIER UNE ANNONCE (NOUVEAU) -->
-                <div class="tab-pane fade" id="tab-publish">
-                    <div class="card card-custom p-5 text-center shadow-sm border-0 bg-white relative overflow-hidden">
-                        <!-- Effet de fond subtil -->
-                        <div class="position-absolute top-0 start-0 w-100 h-100" style="background: radial-gradient(circle at top right, rgba(245, 158, 11, 0.05), transparent 40%); pointer-events: none;"></div>
-                        
-                        <div class="position-relative z-1">
-                            <div class="mb-4">
-                                <i class="fa-solid fa-rocket text-warning" style="font-size: 4rem; filter: drop-shadow(0 0 15px rgba(245,158,11,0.4));"></i>
-                            </div>
-                            <h2 class="fw-extrabold text-dark mb-3">Prêt à conquérir le marché ?</h2>
-                            <p class="text-muted fs-5 mb-4 max-w-2xl mx-auto">
-                                <strong class="text-dark">One Market, One Movement.</strong><br>
-                                Que vous soyez artisan, entreprise, ou prestataire de services, MAN GO connecte vos offres au monde entier.
-                            </p>
-                            
-                            <a href="../publish.php" class="btn btn-mango btn-lg rounded-pill px-5 fw-bold shadow-sm">
-                                <i class="fa-solid fa-pen-nib me-2"></i> Accéder à l'éditeur complet
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB 4: PARAMÈTRES BUSINESS (ACCUEIL & ABSENCE) -->
-                <div class="tab-pane fade" id="tab-settings">
-                    <h4 class="fw-bold mb-4">Chat & Réponses Automatiques</h4>
-                    <div class="card card-custom p-4 shadow-sm">
-                        <form id="businessSettingsForm" onsubmit="saveBusinessSettings(event)">
-                            
-                            <div class="p-3 bg-light rounded-3 mb-4 border border-light-subtle">
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input fs-5" type="checkbox" id="isAway">
-                                    <label class="form-check-label fw-bold ms-2 mt-1" for="isAway">Activer le Mode Absence</label>
-                                </div>
-                                <small class="text-muted d-block ms-5 mb-3">Répond automatiquement à tous les messages reçus quand vous n'êtes pas disponible.</small>
-                                
-                                <div class="ms-5">
-                                    <label class="form-label fw-semibold text-dark">Message d'absence</label>
-                                    <textarea id="autoReplyMessage" class="form-control" rows="2" placeholder="Bonjour, je suis actuellement indisponible. Je vous réponds dès mon retour."></textarea>
-                                </div>
-                            </div>
-
-                            <div class="p-3 bg-light rounded-3 mb-4 border border-light-subtle">
-                                <div class="form-check form-switch mb-2">
-                                    <input class="form-check-input fs-5" type="checkbox" id="autoReplyEnabled">
-                                    <label class="form-check-label fw-bold ms-2 mt-1" for="autoReplyEnabled">Message d'Accueil Automatique</label>
-                                </div>
-                                <small class="text-muted d-block ms-5 mb-3">Envoyé automatiquement lors de la première prise de contact d'un client.</small>
-                                
-                                <div class="ms-5">
-                                    <label class="form-label fw-semibold text-dark">Message de bienvenue</label>
-                                    <textarea id="welcomeMessage" class="form-control" rows="2" placeholder="Bienvenue sur ma boutique ! En quoi puis-je vous aider aujourd'hui ?"></textarea>
-                                </div>
-                            </div>
-
-                            <div class="text-end mt-4">
-                                <button type="submit" class="btn btn-mango fw-bold rounded-pill px-5"><i class="fa-solid fa-save me-2"></i> Enregistrer les paramètres</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- TAB 5: RÉPONSES RAPIDES -->
-                <div class="tab-pane fade" id="tab-quick">
-                    <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h4 class="fw-bold m-0">Gestion des Raccourcis</h4>
-                        <button class="btn btn-mango btn-sm rounded-pill px-3 fw-bold shadow-sm" onclick="openQuickModal()">
-                            <i class="fa-solid fa-plus me-1"></i> Ajouter un raccourci
-                        </button>
-                    </div>
-
-                    <div class="card card-custom p-0 overflow-hidden shadow-sm">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th class="py-3 px-4">Raccourci</th>
-                                        <th>Message prédéfini</th>
-                                        <th class="text-end px-4">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="quickRepliesTable">
-                                    <tr><td colspan="3" class="text-center text-muted py-4">Chargement...</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
             </div>
-        </div>
+
+            <!-- TAB 3: PUBLIER UNE ANNONCE -->
+            <div id="tab-publish" class="tab-pane hidden">
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-10 text-center shadow-sm relative overflow-hidden">
+                    <div class="absolute inset-0" style="background: radial-gradient(circle at top right, rgba(245, 158, 11, 0.05), transparent 40%); pointer-events: none;"></div>
+                    <div class="relative z-10 py-4 sm:py-8">
+                        <i class="fa-solid fa-rocket text-amber-500 text-5xl sm:text-6xl mb-6" style="filter: drop-shadow(0 0 15px rgba(245,158,11,0.4));"></i>
+                        <h2 class="font-extrabold text-2xl sm:text-3xl text-slate-900 mb-4">Prêt à conquérir le marché ?</h2>
+                        <p class="text-slate-500 text-base sm:text-lg mb-8 max-w-2xl mx-auto px-4">
+                            <strong class="text-slate-900">One Market, One Movement.</strong><br>
+                            Que vous soyez artisan, entreprise, ou prestataire de services, MAN GO connecte vos offres au monde entier.
+                        </p>
+                        <a href="../publish.php" class="inline-block bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3 px-6 sm:py-4 sm:px-8 rounded-full shadow-lg hover:shadow-xl transition transform hover:-translate-y-1">
+                            <i class="fa-solid fa-pen-nib mr-2"></i> Accéder à l'éditeur complet
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: PARAMÈTRES BUSINESS -->
+            <div id="tab-settings" class="tab-pane hidden">
+                <h4 class="font-bold text-xl mb-6 text-slate-900">Chat & Réponses Automatiques</h4>
+                <div class="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 shadow-sm">
+                    <form id="businessSettingsForm" onsubmit="saveBusinessSettings(event)">
+                         <div class="bg-slate-50 p-6 rounded-xl border border-slate-100 mb-6">
+                            <label class="flex items-center cursor-pointer mb-2">
+                                <div class="relative">
+                                    <input type="checkbox" id="isAway" class="sr-only">
+                                    <div class="block bg-slate-300 w-10 h-6 rounded-full transition-colors" id="bg-isAway"></div>
+                                    <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition transform" id="dot-isAway"></div>
+                                </div>
+                                <div class="ml-3 font-bold text-slate-900">Activer le Mode Absence</div>
+                            </label>
+                            <p class="text-xs sm:text-sm text-slate-500 ml-14 mb-4">Répond automatiquement à tous les messages reçus.</p>
+                            <div class="ml-0 sm:ml-14 mt-4 sm:mt-0">
+                                <label class="block text-sm font-bold text-slate-700 mb-2">Message d'absence</label>
+                                <textarea id="autoReplyMessage" class="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm" rows="3" placeholder="Bonjour, je suis actuellement indisponible..."></textarea>
+                            </div>
+                        </div>
+                        <div class="text-right mt-8">
+                            <button type="submit" class="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3 px-8 rounded-full shadow hover:shadow-lg transition">
+                                <i class="fa-solid fa-save mr-2"></i> Enregistrer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- TAB 5: RÉPONSES RAPIDES -->
+            <div id="tab-quick" class="tab-pane hidden">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                    <h4 class="font-bold text-xl m-0 text-slate-900">Gestion des Raccourcis</h4>
+                    <button onclick="openQuickModal()" class="w-full sm:w-auto bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-2 px-5 rounded-full text-sm shadow hover:shadow-lg transition">
+                        <i class="fa-solid fa-plus mr-1"></i> Ajouter un raccourci
+                    </button>
+                </div>
+                 <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm whitespace-nowrap">
+                            <thead class="bg-slate-50 text-slate-600 font-bold border-b border-slate-200">
+                                <tr>
+                                    <th class="py-4 px-6">Raccourci</th>
+                                    <th class="py-4 px-6">Message</th>
+                                    <th class="py-4 px-6 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="quickRepliesTable" class="divide-y divide-slate-100">
+                                <tr><td colspan="3" class="text-center py-8 text-slate-500">Chargement...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
-</div>
 
-<!-- MODAL AJOUT RÉPONSE RAPIDE -->
-<div class="modal fade" id="quickReplyModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content card-custom border-0 shadow-lg">
-            <div class="modal-header border-bottom-0 pb-0">
-                <h5 class="modal-title fw-extrabold text-dark">Nouveau Raccourci</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <!-- MODAL AJOUT RÉPONSE RAPIDE -->
+    <div id="quickReplyModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center opacity-0 transition-opacity duration-300 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md transform scale-95 transition-transform duration-300" id="quickReplyModalContent">
+            <div class="flex justify-between items-center p-6 border-b border-slate-100">
+                <h5 class="font-extrabold text-xl text-slate-900">Nouveau Raccourci</h5>
+                <button onclick="closeQuickModal()" class="text-slate-400 hover:text-slate-700 transition text-2xl leading-none">&times;</button>
             </div>
-            <div class="modal-body">
+            <div class="p-6">
                 <form id="quickReplyForm" onsubmit="saveQuickReply(event)">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-muted">Intitulé / Raccourci</label>
-                        <input type="text" id="quickShortcut" class="form-control form-control-lg" placeholder="ex: /prix, /livraison, Merci" required>
+                    <div class="mb-5">
+                        <label class="block text-sm font-bold text-slate-700 mb-2">Raccourci</label>
+                        <input type="text" id="quickShortcut" class="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none" required>
                     </div>
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold text-muted">Message complet</label>
-                        <textarea id="quickMessage" class="form-control" rows="4" placeholder="Texte qui sera inséré dans la discussion..." required></textarea>
+                    <div class="mb-6">
+                        <label class="block text-sm font-bold text-slate-700 mb-2">Message</label>
+                        <textarea id="quickMessage" class="w-full border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none" rows="3" required></textarea>
                     </div>
-                    <button type="submit" class="btn btn-mango w-100 fw-bold rounded-pill py-2">Enregistrer le raccourci</button>
+                    <button type="submit" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 text-white font-bold py-3 rounded-xl shadow hover:shadow-lg transition">Enregistrer</button>
                 </form>
             </div>
         </div>
     </div>
-</div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    const CURRENCY = <?=json_encode($currency)?>;
+    <!-- TOUT LE JAVASCRIPT COMPLET -->
+    <script>
+        const CURRENCY = <?=json_encode($currency)?>;
 
-    document.addEventListener('DOMContentLoaded', () => {
-        loadVendorStats();
-        loadBusinessSettings();
-        loadQuickReplies();
-    });
-
-    async function loadVendorStats() {
-        try {
-            const res = await fetch('../api/vendor.php?action=getStats');
-            const data = await res.json();
-
-            const container = document.getElementById('statsContainer');
-            container.innerHTML = `
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="stat-card d-flex align-items-center gap-3">
-                        <div class="stat-icon bg-warning bg-opacity-10 text-warning"><i class="fa-solid fa-box"></i></div>
-                        <div>
-                            <small class="text-muted fw-semibold d-block">Annonces Actives</small>
-                            <h4 class="fw-extrabold m-0 text-dark">${data.active_products || 0}</h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="stat-card d-flex align-items-center gap-3">
-                        <div class="stat-icon bg-success bg-opacity-10 text-success"><i class="fa-solid fa-cart-check"></i></div>
-                        <div>
-                            <small class="text-muted fw-semibold d-block">Ventes Réalisées</small>
-                            <h4 class="fw-extrabold m-0 text-dark">${data.total_sales || 0}</h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="stat-card d-flex align-items-center gap-3">
-                        <div class="stat-icon bg-primary bg-opacity-10 text-primary"><i class="fa-solid fa-wallet"></i></div>
-                        <div>
-                            <small class="text-muted fw-semibold d-block">Revenus Total</small>
-                            <h4 class="fw-extrabold m-0 text-dark">${Number(data.total_revenue || 0).toLocaleString()} ${CURRENCY}</h4>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="stat-card d-flex align-items-center gap-3">
-                        <div class="stat-icon bg-info bg-opacity-10 text-info"><i class="fa-solid fa-comments"></i></div>
-                        <div>
-                            <small class="text-muted fw-semibold d-block">Discussions</small>
-                            <h4 class="fw-extrabold m-0 text-dark">${data.active_chats || 0}</h4>
-                        </div>
-                    </div>
-                </div>
-            `;
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    async function loadBusinessSettings() {
-        try {
-            const res = await fetch('../api/chat.php?action=getBusinessSettings');
-            const data = await res.json();
-
-            document.getElementById('isAway').checked = data.is_away == 1;
-            document.getElementById('autoReplyMessage').value = data.auto_reply_message || '';
-            document.getElementById('autoReplyEnabled').checked = data.auto_reply_enabled == 1;
-            document.getElementById('welcomeMessage').value = data.welcome_message || '';
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    async function saveBusinessSettings(e) {
-        e.preventDefault();
-        const formData = new URLSearchParams({
-            action: 'saveBusinessSettings',
-            is_away: document.getElementById('isAway').checked ? 1 : 0,
-            auto_reply_message: document.getElementById('autoReplyMessage').value,
-            auto_reply_enabled: document.getElementById('autoReplyEnabled').checked ? 1 : 0,
-            welcome_message: document.getElementById('welcomeMessage').value
+        document.addEventListener('DOMContentLoaded', () => {
+            loadVendorStats();
+            loadBusinessSettings();
+            loadQuickReplies();
+            setupToggleSwitches();
         });
 
-        try {
-            const res = await fetch('../api/chat.php', { method: 'POST', body: formData });
-            const result = await res.json();
-            if (result.status === 'success') {
-                alert('Paramètres sauvegardés avec succès !');
+        // Menu Mobile
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            
+            sidebar.classList.toggle('-translate-x-full'); 
+            
+            if(overlay.classList.contains('hidden')) {
+                overlay.classList.remove('hidden');
+                setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+            } else {
+                overlay.classList.add('opacity-0');
+                setTimeout(() => overlay.classList.add('hidden'), 300);
             }
-        } catch (e) {
-            console.error(e);
         }
-    }
 
-    async function loadQuickReplies() {
-        try {
-            const res = await fetch('../api/chat.php?action=getQuickReplies');
-            const replies = await res.json();
-
-            const tbody = document.getElementById('quickRepliesTable');
-            if (!replies || replies.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-5">Aucun raccourci enregistré.</td></tr>';
-                return;
-            }
-
-            let html = '';
-            replies.forEach(r => {
-                html += `
-                    <tr>
-                        <td class="px-4"><span class="badge bg-dark fw-normal px-2 py-1">${escapeHtml(r.shortcut)}</span></td>
-                        <td class="text-secondary">${escapeHtml(r.message)}</td>
-                        <td class="text-end px-4">
-                            <button onclick="deleteQuickReply(${r.id})" class="btn btn-sm btn-outline-danger rounded-circle" style="width: 32px; height: 32px;"><i class="fa-solid fa-trash"></i></button>
-                        </td>
-                    </tr>
-                `;
+        // Navigation par onglets
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-link').forEach(el => {
+                el.className = 'nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all';
             });
-            tbody.innerHTML = html;
-        } catch (e) {
-            console.error(e);
+            document.getElementById(tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById(tabId + '-btn');
+            activeBtn.className = 'nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold transition-all bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md';
+            
+            if(window.innerWidth < 1024) toggleSidebar(); 
         }
-    }
 
-    function openQuickModal() {
-        document.getElementById('quickReplyForm').reset();
-        new bootstrap.Modal(document.getElementById('quickReplyModal')).show();
-    }
+        // Animation des boutons switch
+        function setupToggleSwitches() {
+            ['isAway', 'autoReplyEnabled'].forEach(id => {
+                const checkbox = document.getElementById(id);
+                if(checkbox) {
+                    const bg = document.getElementById('bg-' + (id==='isAway'?'isAway':'autoReply'));
+                    const dot = document.getElementById('dot-' + (id==='isAway'?'isAway':'autoReply'));
+                    
+                    checkbox.addEventListener('change', (e) => {
+                        if(e.target.checked) {
+                            bg.classList.replace('bg-slate-300', 'bg-amber-500');
+                            dot.classList.add('translate-x-4');
+                        } else {
+                            bg.classList.replace('bg-amber-500', 'bg-slate-300');
+                            dot.classList.remove('translate-x-4');
+                        }
+                    });
+                }
+            });
+        }
 
-    async function saveQuickReply(e) {
-        e.preventDefault();
-        const formData = new URLSearchParams({
-            action: 'addQuickReply',
-            shortcut: document.getElementById('quickShortcut').value,
-            message: document.getElementById('quickMessage').value
-        });
+        // Gestion du Modal
+        function openQuickModal() {
+            const modal = document.getElementById('quickReplyModal');
+            const modalContent = document.getElementById('quickReplyModalContent');
+            document.getElementById('quickReplyForm').reset();
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.remove('opacity-0'); modalContent.classList.remove('scale-95'); }, 10);
+        }
 
-        try {
-            const res = await fetch('../api/chat.php', { method: 'POST', body: formData });
-            const result = await res.json();
-            if (result.status === 'success') {
-                bootstrap.Modal.getInstance(document.getElementById('quickReplyModal')).hide();
-                loadQuickReplies();
+        function closeQuickModal() {
+            const modal = document.getElementById('quickReplyModal');
+            const modalContent = document.getElementById('quickReplyModalContent');
+            modal.classList.add('opacity-0');
+            modalContent.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); }, 300);
+        }
+
+        // =====================================
+        // APPELS API (STATS, CHAT, RACCOURCIS)
+        // =====================================
+        async function loadVendorStats() {
+            try {
+                const res = await fetch('../api/vendor.php?action=getStats');
+                const data = await res.json();
+                const container = document.getElementById('statsContainer');
+                
+                container.innerHTML = `
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                        <div class="bg-amber-50 text-amber-500 w-14 h-14 rounded-xl flex items-center justify-center text-2xl"><i class="fa-solid fa-box"></i></div>
+                        <div>
+                            <p class="text-sm text-slate-500 font-bold">Annonces Actives</p>
+                            <h4 class="font-black text-2xl text-slate-900 m-0">${data.active_products || 0}</h4>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                        <div class="bg-emerald-50 text-emerald-500 w-14 h-14 rounded-xl flex items-center justify-center text-2xl"><i class="fa-solid fa-cart-check"></i></div>
+                        <div>
+                            <p class="text-sm text-slate-500 font-bold">Ventes Réalisées</p>
+                            <h4 class="font-black text-2xl text-slate-900 m-0">${data.total_sales || 0}</h4>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                        <div class="bg-blue-50 text-blue-500 w-14 h-14 rounded-xl flex items-center justify-center text-2xl"><i class="fa-solid fa-wallet"></i></div>
+                        <div>
+                            <p class="text-sm text-slate-500 font-bold">Revenus Total</p>
+                            <h4 class="font-black text-2xl text-slate-900 m-0">${Number(data.total_revenue || 0).toLocaleString()} ${CURRENCY}</h4>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4 hover:shadow-md transition">
+                        <div class="bg-indigo-50 text-indigo-500 w-14 h-14 rounded-xl flex items-center justify-center text-2xl"><i class="fa-solid fa-comments"></i></div>
+                        <div>
+                            <p class="text-sm text-slate-500 font-bold">Discussions</p>
+                            <h4 class="font-black text-2xl text-slate-900 m-0">${data.active_chats || 0}</h4>
+                        </div>
+                    </div>
+                `;
+            } catch (e) {
+                console.error("Erreur Stats:", e);
+                document.getElementById('statsContainer').innerHTML = `<p class="col-span-full text-red-500">Erreur lors du chargement des statistiques.</p>`;
             }
-        } catch (e) {
-            console.error(e);
         }
-    }
 
-    async function deleteQuickReply(id) {
-        if (!confirm('Êtes-vous sûr de vouloir supprimer ce raccourci ?')) return;
-        try {
-            const res = await fetch(`../api/chat.php?action=deleteQuickReply&id=${id}`, { method: 'POST' });
-            const result = await res.json();
-            if (result.status === 'success') loadQuickReplies();
-        } catch (e) {
-            console.error(e);
+        async function loadBusinessSettings() {
+            try {
+                const res = await fetch('../api/chat.php?action=getBusinessSettings');
+                const data = await res.json();
+
+                const isAwayCb = document.getElementById('isAway');
+                if(isAwayCb) {
+                    isAwayCb.checked = data.is_away == 1;
+                    isAwayCb.dispatchEvent(new Event('change'));
+                }
+                
+                const autoReplyCb = document.getElementById('autoReplyEnabled');
+                if(autoReplyCb) {
+                    autoReplyCb.checked = data.auto_reply_enabled == 1;
+                    autoReplyCb.dispatchEvent(new Event('change'));
+                }
+
+                if(document.getElementById('autoReplyMessage')) document.getElementById('autoReplyMessage').value = data.auto_reply_message || '';
+                if(document.getElementById('welcomeMessage')) document.getElementById('welcomeMessage').value = data.welcome_message || '';
+            } catch (e) { console.error("Erreur Settings:", e); }
         }
-    }
 
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-</script>
+        async function saveBusinessSettings(e) {
+            e.preventDefault();
+            const formData = new URLSearchParams({
+                action: 'saveBusinessSettings',
+                is_away: document.getElementById('isAway').checked ? 1 : 0,
+                auto_reply_message: document.getElementById('autoReplyMessage').value,
+                auto_reply_enabled: document.getElementById('autoReplyEnabled') ? (document.getElementById('autoReplyEnabled').checked ? 1 : 0) : 0,
+                welcome_message: document.getElementById('welcomeMessage') ? document.getElementById('welcomeMessage').value : ''
+            });
+
+            try {
+                const res = await fetch('../api/chat.php', { method: 'POST', body: formData });
+                const result = await res.json();
+                if (result.status === 'success') alert('Paramètres sauvegardés avec succès !');
+            } catch (e) { console.error(e); }
+        }
+
+        async function loadQuickReplies() {
+            try {
+                const res = await fetch('../api/chat.php?action=getQuickReplies');
+                const replies = await res.json();
+                const tbody = document.getElementById('quickRepliesTable');
+                
+                if (!replies || replies.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-slate-500">Aucun raccourci enregistré.</td></tr>';
+                    return;
+                }
+
+                let html = '';
+                replies.forEach(r => {
+                    html += `
+                        <tr class="hover:bg-slate-50 transition">
+                            <td class="py-4 px-6"><span class="bg-slate-900 text-white rounded-md px-2 py-1 text-xs font-mono">${escapeHtml(r.shortcut)}</span></td>
+                            <td class="py-4 px-6 text-slate-600">${escapeHtml(r.message)}</td>
+                            <td class="py-4 px-6 text-right">
+                                <button onclick="deleteQuickReply(${r.id})" class="text-red-400 hover:text-red-600 hover:bg-red-50 p-2 rounded-full transition" title="Supprimer">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                tbody.innerHTML = html;
+            } catch (e) { console.error("Erreur Shortcuts:", e); }
+        }
+
+        async function saveQuickReply(e) {
+            e.preventDefault();
+            const formData = new URLSearchParams({
+                action: 'addQuickReply',
+                shortcut: document.getElementById('quickShortcut').value,
+                message: document.getElementById('quickMessage').value
+            });
+
+            try {
+                const res = await fetch('../api/chat.php', { method: 'POST', body: formData });
+                const result = await res.json();
+                if (result.status === 'success') {
+                    closeQuickModal();
+                    loadQuickReplies();
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function deleteQuickReply(id) {
+            if (!confirm('Êtes-vous sûr de vouloir supprimer ce raccourci ?')) return;
+            try {
+                const res = await fetch(`../api/chat.php?action=deleteQuickReply&id=${id}`, { method: 'POST' });
+                const result = await res.json();
+                if (result.status === 'success') loadQuickReplies();
+            } catch (e) { console.error(e); }
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+    </script>
 </body>
 </html>

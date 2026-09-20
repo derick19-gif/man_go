@@ -9,6 +9,9 @@ if (!file_exists($headerPath)) $headerPath = __DIR__ . '/../../../app/views/layo
 if (file_exists($headerPath)) require_once $headerPath;
 
 $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
+
+// On convertit le statut en majuscule pour être sûr à 100% de la correspondance avec la base de données
+$kycStatus = !empty($kycData['status']) ? strtoupper($kycData['status']) : '';
 ?>
 
 <!-- Importation de Alpine.js pour la logique interactive du formulaire -->
@@ -31,30 +34,41 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
             <?php unset($_SESSION['kyc_error']); ?>
         <?php endif; ?>
 
-        <?php if (!empty($kycData['status']) && $kycData['status'] === 'pending'): ?>
-            <div class="bg-amber-50 border-l-4 border-amber-500 p-6 mb-6 rounded-r-xl shadow-sm">
-                <h3 class="text-amber-800 font-bold text-lg mb-1"><i class="fa-solid fa-hourglass-half mr-2"></i>Dossier en cours d'examen</h3>
-                <p class="text-amber-700 text-sm">Votre dossier KYC a bien été reçu. Notre équipe de sécurité l'examine actuellement. Vous pourrez publier des annonces dès qu'il sera validé.</p>
-            </div>
-        <?php elseif (!empty($kycData['status']) && $kycData['status'] === 'approved'): ?>
-            <div class="bg-emerald-50 border-l-4 border-emerald-500 p-6 mb-6 rounded-r-xl shadow-sm">
-                <h3 class="text-emerald-800 font-bold text-lg mb-1"><i class="fa-solid fa-shield-check mr-2"></i>Compte Certifié</h3>
-                <p class="text-emerald-700 text-sm">Votre identité est validée. Vous pouvez désormais vendre et publier librement sur la plateforme.</p>
-                <div class="mt-4">
-                    <a href="<?= $baseUrl ?>/publish.php" class="inline-block bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-full text-sm transition">Aller publier</a>
+        <!-- 1. CAS : APPROUVÉ (Succès Vert) -->
+        <?php if ($kycStatus === 'APPROVED'): ?>
+            <div class="bg-emerald-50 border border-emerald-200 p-8 rounded-2xl text-center shadow-sm mt-8">
+                <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <i class="fa-solid fa-check text-4xl text-emerald-600"></i>
                 </div>
+                <h3 class="text-2xl font-black text-emerald-900 mb-3">Félicitations, vous êtes certifié !</h3>
+                <p class="text-emerald-700 font-medium mb-8 max-w-lg mx-auto">
+                    Votre identité a été validée avec succès par l'équipe de sécurité MAN GO. Vous bénéficiez désormais de la confiance de notre communauté et pouvez commencer à vendre dès maintenant.
+                </p>
+                <a href="<?= $baseUrl ?>/publish" class="inline-block bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-10 rounded-full transition transform hover:-translate-y-1 shadow-lg text-lg">
+                    <i class="fa-solid fa-rocket mr-2"></i> Publier ma première annonce
+                </a>
             </div>
-        <?php endif; ?>
 
-        <!-- Formulaire KYC (Caché si déjà en attente ou approuvé, sauf s'il faut renouveler) -->
-        <?php if (empty($kycData) || $kycData['status'] === 'rejected' || (!empty($_SESSION['kyc_error']))): ?>
-            
+        <!-- 2. CAS : EN ATTENTE (Orange) -->
+        <?php elseif ($kycStatus === 'PENDING'): ?>
+            <div class="border-l-4 border-amber-500 bg-amber-50 p-6 rounded-r-xl shadow-sm mt-8">
+                <div class="flex items-center mb-2">
+                    <i class="fa-solid fa-hourglass-half text-amber-600 text-xl mr-3"></i>
+                    <h3 class="text-lg font-bold text-amber-900 m-0">Dossier en cours d'examen</h3>
+                </div>
+                <p class="text-amber-800 text-sm ml-8">
+                    Votre dossier KYC a bien été reçu. Notre équipe de sécurité l'examine actuellement. Vous pourrez publier des annonces dès qu'il sera validé.
+                </p>
+            </div>
+
+        <!-- 3. CAS : NOUVEAU OU REJETÉ (Affiche le formulaire) -->
+        <?php else: ?>
             <form action="<?= $baseUrl ?>/verification.php" method="POST" enctype="multipart/form-data" class="bg-white shadow-md rounded-2xl border border-gray-200 p-8 space-y-8" x-data="{ accountType: 'individual' }">
                 
                 <!-- Sélection du type de compte -->
                 <div>
                     <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Type de Compte *</label>
-                    <select name="account_type" x-model="accountType" class="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition font-medium">
+                    <select name="account_type" x-model="accountType" class="w-full bg-white text-slate-900 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition font-medium">
                         <option value="individual">Vendeur Particulier / Auto-entrepreneur</option>
                         <option value="company">Entreprise Immatriculée (SARL, SA, etc.)</option>
                     </select>
@@ -68,18 +82,18 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Date de délivrance *</label>
-                            <input type="date" name="id_issue_date" required class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+                            <input type="date" name="id_issue_date" required class="w-full bg-white text-slate-900 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Date d'expiration *</label>
-                            <input type="date" name="id_expiration_date" required class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+                            <input type="date" name="id_expiration_date" required class="w-full bg-white text-slate-900 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
                             <p class="text-[10px] text-amber-600 font-bold mt-1">Sert à garantir la conformité continue de votre compte.</p>
                         </div>
                     </div>
 
                     <div class="mt-4">
                         <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Fichier de la pièce (Recto/Verso) *</label>
-                        <input type="file" name="id_document_path" required accept=".pdf,.jpg,.jpeg,.png" class="w-full border border-gray-300 rounded-xl p-2 bg-white text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-slate-900 file:text-white hover:file:bg-slate-800 transition cursor-pointer">
+                        <input type="file" name="id_document_path" required accept=".pdf,.jpg,.jpeg,.png" class="w-full border border-gray-300 rounded-xl p-2 bg-white text-slate-900 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-slate-900 file:text-white hover:file:bg-slate-800 transition cursor-pointer">
                     </div>
                 </div>
 
@@ -90,11 +104,11 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Nom de l'Entreprise *</label>
-                            <input type="text" name="company_name" :required="accountType === 'company'" placeholder="Raison sociale" class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+                            <input type="text" name="company_name" :required="accountType === 'company'" placeholder="Raison sociale" class="w-full bg-white text-slate-900 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
                         </div>
                         <div>
                             <label class="block text-xs font-bold text-gray-700 uppercase mb-2">N° RCCM ou Équivalent *</label>
-                            <input type="text" name="registration_number" :required="accountType === 'company'" placeholder="Numéro d'immatriculation" class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+                            <input type="text" name="registration_number" :required="accountType === 'company'" placeholder="Numéro d'immatriculation" class="w-full bg-white text-slate-900 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
                         </div>
                     </div>
 
@@ -104,20 +118,20 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Nom Gérant Principal *</label>
-                                <input type="text" name="primary_manager_name" :required="accountType === 'company'" class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+                                <input type="text" name="primary_manager_name" :required="accountType === 'company'" class="w-full bg-white text-slate-900 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 uppercase mb-2">ID Gérant Principal *</label>
-                                <input type="text" name="primary_manager_id_card" :required="accountType === 'company'" placeholder="Numéro de pièce" class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+                                <input type="text" name="primary_manager_id_card" :required="accountType === 'company'" placeholder="Numéro de pièce" class="w-full bg-white text-slate-900 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
                             </div>
                             
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Nom Second Responsable *</label>
-                                <input type="text" name="secondary_manager_name" :required="accountType === 'company'" placeholder="Co-gérant, directeur..." class="w-full border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
+                                <input type="text" name="secondary_manager_name" :required="accountType === 'company'" placeholder="Co-gérant, directeur..." class="w-full bg-white text-slate-900 border border-gray-300 rounded-xl p-3 focus:ring-2 focus:ring-amber-500 outline-none text-sm">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Pièce du Second Responsable *</label>
-                                <input type="file" name="secondary_manager_id_card" :required="accountType === 'company'" accept=".pdf,.jpg,.jpeg,.png" class="w-full border border-gray-300 bg-white rounded-xl p-2 text-sm">
+                                <input type="file" name="secondary_manager_id_card" :required="accountType === 'company'" accept=".pdf,.jpg,.jpeg,.png" class="w-full border border-gray-300 bg-white text-slate-900 rounded-xl p-2 text-sm">
                             </div>
                         </div>
                     </div>

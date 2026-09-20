@@ -61,8 +61,11 @@ class KycController
     public function index()
     {
         if (session_status() === PHP_SESSION_NONE) session_start();
+        
+        $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
+
         if (empty($_SESSION['user_id'])) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . $baseUrl . '/login');
             exit;
         }
 
@@ -76,8 +79,11 @@ class KycController
     public function submit()
     {
         if (session_status() === PHP_SESSION_NONE) session_start();
+        
+        $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
+
         if (empty($_SESSION['user_id'])) {
-            header('Location: ' . BASE_URL . '/login');
+            header('Location: ' . $baseUrl . '/login');
             exit;
         }
 
@@ -101,7 +107,6 @@ class KycController
             $idDocPath = $this->handleSecureUpload($_FILES['id_document_path']);
             $accountType = $_POST['account_type'] ?? 'individual';
             
-            // ... (Ici le reste de votre logique d'entreprise reste identique)
             $companyName = $_POST['company_name'] ?? null;
             $registrationNumber = $_POST['registration_number'] ?? null;
             $taxId = $_POST['tax_id'] ?? null;
@@ -137,22 +142,39 @@ class KycController
             $this->kycModel->submit($_SESSION['user_id'], $formData);
             
             $_SESSION['success_message'] = "Votre dossier KYC a été soumis avec succès.";
-            header('Location: ' . BASE_URL . '/verification');
+            header('Location: ' . $baseUrl . '/verification.php');
             exit;
 
         } catch (Exception $e) {
             $_SESSION['error_message'] = $e->getMessage();
-            header('Location: ' . BASE_URL . '/verification');
+            header('Location: ' . $baseUrl . '/verification.php');
             exit;
         }
     }
 
     private function handleSecureUpload(array $file): string
     {
-        // ... (Gardez votre fonction handleSecureUpload actuelle)
-        $newFileName = 'kyc_' . uniqid() . '_' . time() . '.pdf'; // Simplifié pour l'exemple
+        // Sécurité : on vérifie l'extension du fichier
+        $allowedExtensions = ['pdf', 'jpg', 'jpeg', 'png'];
+        $fileInfo = pathinfo($file['name']);
+        $ext = strtolower($fileInfo['extension'] ?? '');
+
+        if (!in_array($ext, $allowedExtensions)) {
+            throw new Exception("Format de fichier non autorisé. Utilisez uniquement PDF, JPG ou PNG.");
+        }
+
+        // Sécurité : on limite la taille (ex: 5 Mo)
+        if ($file['size'] > 5 * 1024 * 1024) {
+            throw new Exception("Le fichier est trop volumineux (5 Mo maximum).");
+        }
+
+        $newFileName = 'kyc_' . uniqid() . '_' . time() . '.' . $ext;
         $destination = $this->uploadDir . $newFileName;
-        move_uploaded_file($file['tmp_name'], $destination);
+        
+        if (!move_uploaded_file($file['tmp_name'], $destination)) {
+            throw new Exception("Erreur lors de l'enregistrement du fichier sécurisé.");
+        }
+        
         return 'public/uploads/kyc/' . $newFileName;
     }
 }

@@ -76,8 +76,8 @@ class Session
             if (isset($_SESSION['_last_activity']) && (time() - $_SESSION['_last_activity'] > $timeout)) {
                 self::destroy();
                 
-                // Redirection sécurisée MVC via BASE_URL_PATH
-                $basePath = defined('BASE_URL_PATH') ? BASE_URL_PATH : '/man_go';
+                // Redirection sécurisée MVC via APP_URL_PATH
+                $basePath = defined('APP_URL_PATH') ? APP_URL_PATH : '/man_go';
                 header('Location: ' . $basePath . '/login.php?expired=1');
                 exit;
             }

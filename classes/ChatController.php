@@ -3,45 +3,44 @@
 namespace App\Controllers;
 
 use App\Core\Controller;
-use App\Core\Database; // <-- LE VOILÀ ! Le bon chemin vers la base de données
-use App\Core\Request;  // <-- Pareil pour Request, il est dans Core
-use Session;           // <-- Session reste global, on n'y touche pas
+use App\Core\Database;
+use App\Core\Request;
+use Session;
 
 class ChatController extends Controller {
 
-    /**
-     * Envoie un message avec gestion automatique des filtres et rponses automatiques (accueil / absence)
-     */
     public function sendMessage() {
         $db = Database::connect();
         $sender_id = Session::getUserId();
         $receiver_id = $_POST['receiver_id'] ?? 0;
-        $message = $this->filterMessage($_POST['message'] ?? '');
+        $raw_message = trim($_POST['message'] ?? '');
         $product_id = $_POST['product_id'] ?? null;
 
-        if (empty($receiver_id) || empty($message)) {
-            echo json_encode(['status' => 'error', 'message' => 'Donnes incompltes']);
+        if (empty($receiver_id) || empty($raw_message)) {
+            echo json_encode(['status' => 'error', 'message' => 'Données incomplètes']);
             return;
         }
 
-        // Insertion du message principal
+        // 🛡️ Filtre de sécurité MAN GO Shield
+        $message = $this->filterMessage($raw_message);
+        if ($message === '[BLOQUÉ]') {
+            echo json_encode(['status' => 'error', 'message' => 'Votre message contient des termes non autorisés par nos conditions.']);
+            return;
+        }
+
         $stmt = $db->prepare("INSERT INTO messages (sender_id, receiver_id, message, created_at, product_id) VALUES (?, ?, ?, NOW(), ?)");
         $stmt->execute([$sender_id, $receiver_id, $message, $product_id]);
 
-        // Vrification si le destinataire possde des rponses automatiques / absence
+        // Gestion Réponses automatiques / Absence
         $stmtBusiness = $db->prepare("SELECT * FROM business_settings WHERE user_id = ?");
         $stmtBusiness->execute([$receiver_id]);
         $settings = $stmtBusiness->fetch(\PDO::FETCH_ASSOC);
 
         if ($settings) {
             $autoReply = null;
-
-            // Si le destinataire est en mode absence
             if ($settings['is_away'] && !empty($settings['auto_reply_message'])) {
                 $autoReply = $settings['auto_reply_message'];
-            } 
-            // Sinon, s'il s'agit de la premire interaction et qu'un message d'accueil est dfini
-            elseif ($settings['auto_reply_enabled'] && !empty($settings['welcome_message'])) {
+            } elseif ($settings['auto_reply_enabled'] && !empty($settings['welcome_message'])) {
                 $stmtCheck = $db->prepare("SELECT COUNT(*) FROM messages WHERE sender_id = ? AND receiver_id = ?");
                 $stmtCheck->execute([$sender_id, $receiver_id]);
                 if ($stmtCheck->fetchColumn() <= 1) {
@@ -49,7 +48,6 @@ class ChatController extends Controller {
                 }
             }
 
-            // Envoi de la rponse automatique du systme au nom du destinataire
             if ($autoReply) {
                 $stmtAuto = $db->prepare("INSERT INTO messages (sender_id, receiver_id, message, created_at, product_id) VALUES (?, ?, ?, NOW(), ?)");
                 $stmtAuto->execute([$receiver_id, $sender_id, $autoReply, $product_id]);
@@ -57,6 +55,20 @@ class ChatController extends Controller {
         }
 
         echo json_encode(['status' => 'success']);
+    }
+
+    /**
+     * LE FILTRE ANTI-INJURES ET ILLÉGAL
+     */
+    private function filterMessage($text) {
+        $text = preg_replace('/(\+?\d{1,4}[ -]?)?\(?\d{2,3}\)?[ -]?\d{3}[ -]?\d{4}/', '[NUMÉRO MASQUÉ]', $text);
+        $text = preg_replace('/(https?:\/\/[^\s]+)/', '[LIEN EXTERNE BLOQUÉ]', $text);
+
+        $badWords = ['con', 'connard', 'salope', 'merde', 'putain', 'drogue', 'cocaïne', 'arme', 'tueur', 'héroïne', 'nègre', 'bougnoule'];
+        foreach ($badWords as $word) {
+            $text = str_ireplace($word, str_repeat('*', strlen($word)), $text);
+        }
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 
     public function deleteMessage($msg_id) {
@@ -87,19 +99,12 @@ class ChatController extends Controller {
         echo json_encode(['status' => 'success']);
     }
 
-    private function filterMessage($text) {
-        $text = preg_replace('/(\+?\d{1,4}[ -]?)?\(?\d{2,3}\)?[ -]?\d{3}[ -]?\d{4}/', '[NUMRO MASQU]', $text);
-        $text = preg_replace('/(https?:\/\/[^\s]+)/', '[LIEN EXTERNE BLOQU]', $text);
-        return htmlspecialchars($text);
-    }
-
     public function getMessages() {
         $db = Database::connect();
         $sender_id = Session::getUserId();
         $receiver_id = $_GET['receiver_id'] ?? 0;
 
-        // Marquer les messages reus comme lus
-        $stmtRead = $db->prepare("UPDATE messages SET is_read = 1, status = 'read' WHERE sender_id = ? AND receiver_id = ?");
+        $stmtRead = $db->prepare("UPDATE messages SET is_read = 1 WHERE sender_id = ? AND receiver_id = ?");
         $stmtRead->execute([$receiver_id, $sender_id]);
 
         $stmt = $db->prepare("SELECT * FROM messages WHERE (sender_id = ? AND receiver_id = ?) OR (sender_id = ? AND receiver_id = ?) ORDER BY created_at ASC");
@@ -115,7 +120,8 @@ class ChatController extends Controller {
             SELECT 
                 m1.*,
                 CASE WHEN m1.sender_id = ? THEN m1.receiver_id ELSE m1.sender_id END AS contact_id,
-                l.label
+                l.label,
+                u.firstname, u.lastname
             FROM messages m1
             INNER JOIN (
                 SELECT 
@@ -127,13 +133,12 @@ class ChatController extends Controller {
                 GROUP BY user1, user2
             ) m2 ON m1.id = m2.max_id
             LEFT JOIN chat_labels l ON l.user_id = ? AND l.chat_id = (CASE WHEN m1.sender_id = ? THEN m1.receiver_id ELSE m1.sender_id END)
+            LEFT JOIN users u ON u.id = (CASE WHEN m1.sender_id = ? THEN m1.receiver_id ELSE m1.sender_id END)
             ORDER BY m1.created_at DESC
         ");
-        $stmt->execute([$user_id, $user_id, $user_id, $user_id, $user_id]);
+        $stmt->execute([$user_id, $user_id, $user_id, $user_id, $user_id, $user_id]);
         echo json_encode($stmt->fetchAll(\PDO::FETCH_ASSOC));
     }
-
-    // --- RPONSES RAPIDES (QUICK REPLIES) ---
 
     public function getQuickReplies() {
         $db = Database::connect();
@@ -148,7 +153,6 @@ class ChatController extends Controller {
         $user_id = Session::getUserId();
         $shortcut = $_POST['shortcut'] ?? '';
         $message = $_POST['message'] ?? '';
-
         $stmt = $db->prepare("INSERT INTO quick_replies (user_id, shortcut, message) VALUES (?, ?, ?)");
         $stmt->execute([$user_id, $shortcut, $message]);
         echo json_encode(['status' => 'success']);
@@ -158,13 +162,10 @@ class ChatController extends Controller {
         $db = Database::connect();
         $user_id = Session::getUserId();
         $id = $_REQUEST['id'] ?? 0;
-
         $stmt = $db->prepare("DELETE FROM quick_replies WHERE id = ? AND user_id = ?");
         $stmt->execute([$id, $user_id]);
         echo json_encode(['status' => 'success']);
     }
-
-    // --- MESSAGES D'ACCUEIL & D'ABSENCE (BUSINESS SETTINGS) ---
 
     public function getBusinessSettings() {
         $db = Database::connect();
@@ -172,13 +173,8 @@ class ChatController extends Controller {
         $stmt = $db->prepare("SELECT * FROM business_settings WHERE user_id = ?");
         $stmt->execute([$user_id]);
         $settings = $stmt->fetch(\PDO::FETCH_ASSOC);
-
         echo json_encode($settings ?: [
-            'user_id' => $user_id,
-            'auto_reply_enabled' => 0,
-            'auto_reply_message' => '',
-            'welcome_message' => '',
-            'is_away' => 0
+            'user_id' => $user_id, 'auto_reply_enabled' => 0, 'auto_reply_message' => '', 'welcome_message' => '', 'is_away' => 0
         ]);
     }
 
@@ -204,7 +200,6 @@ class ChatController extends Controller {
     }
 
     public function proposePrice() {
-        // Ngociation d'offre / proposition de prix
         echo json_encode(['status' => 'success', 'message' => 'Offre soumise']);
     }
 }

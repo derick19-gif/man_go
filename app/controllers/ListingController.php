@@ -35,7 +35,7 @@ class ListingController {
     // ---------------------------------------------------------
     public function create() {
         if (!Session::get('user_id')) {
-            header('Location: ' . (defined('BASE_URL') ? BASE_URL : '') . '/login.php?redirect=publish');
+            header('Location: ' . (defined('APP_URL') ? APP_URL : '') . '/login.php?redirect=publish');
             exit;
         }
 
@@ -49,9 +49,9 @@ class ListingController {
         $stmtUser->execute([Session::get('user_id')]);
         $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-        if (!$user || ($user['kyc_status'] ?? '') !== 'approved') {
+       if (!$user || strtoupper($user['kyc_status'] ?? '') !== 'APPROVED') {
             $_SESSION['flash_error'] = "Vous devez valider votre vérification KYC pour publier une annonce.";
-            header('Location: ' . (defined('BASE_URL') ? BASE_URL : '') . '/kyc/verify');
+            header('Location: ' . (defined('APP_URL') ? APP_URL : '') . '/kyc/verify');
             exit;
         }
 
@@ -76,7 +76,7 @@ class ListingController {
     // ---------------------------------------------------------
     public function store() {
         if (!Session::get('user_id')) {
-            header('Location: ' . (defined('BASE_URL') ? BASE_URL : '') . '/login.php');
+            header('Location: ' . (defined('APP_URL') ? APP_URL : '') . '/login.php');
             exit;
         }
 
@@ -204,7 +204,7 @@ class ListingController {
                     );
                 }
 
-                header("Location: " . (defined('BASE_URL') ? BASE_URL : '') . "/listings/" . $new_id);
+                header("Location: " . (defined('APP_URL') ? APP_URL : '') . "/listings/" . $new_id);
                 exit;
 
             } catch (Exception $e) {
@@ -213,7 +213,63 @@ class ListingController {
         }
 
         $_SESSION['form_errors'] = $errors;
-        header('Location: ' . (defined('BASE_URL') ? BASE_URL : '') . '/publish');
+        header('Location: ' . (defined('APP_URL') ? APP_URL : '') . '/publish');
         exit;
     }
+
+    // ---------------------------------------------------------
+    // NOUVEAU : Affiche les détails d'une annonce spécifique (Vue)
+    // ---------------------------------------------------------
+    public function show() {
+        // 1. Récupérer l'ID de l'annonce depuis l'URL (?id=X)
+        $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        
+        $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
+
+        if (!$id) {
+            header("Location: $baseUrl/"); // Retour à l'accueil si pas d'ID
+            exit;
+        }
+
+        try {
+            $db = Database::getInstance();
+            if (method_exists($db, 'getConnection')) {
+                $db = $db->getConnection();
+            }
+            
+            // 2. Requête SQL pour récupérer l'annonce + les infos du vendeur + la catégorie
+            $stmt = $db->prepare("
+                SELECT l.*, 
+                       c.name AS category_name,
+                       u.firstname, u.lastname, u.avatar, u.phone AS vendor_phone, u.email, u.created_at as vendor_since
+                FROM listings l
+                LEFT JOIN categories c ON l.category_id = c.id
+                LEFT JOIN users u ON l.user_id = u.id
+                WHERE l.id = :id AND l.status = 'ACTIVE'
+            ");
+            $stmt->execute([':id' => $id]);
+            $listing = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Si l'annonce n'existe pas ou n'est plus active
+            if (!$listing) {
+                header("Location: $baseUrl/?error=not_found");
+                exit;
+            }
+
+            // 3. Titre de la page pour le SEO
+            $pageTitle = $listing['title'] . " - MAN GO";
+            
+            // 4. Chargement de la vue (Le HTML que vous allez créer ensuite)
+            $viewPath = __DIR__ . '/../views/listing_detail.php';
+            if (file_exists($viewPath)) {
+                require_once $viewPath;
+            } else {
+                echo "Erreur : La vue listing_detail.php est introuvable.";
+            }
+
+        } catch (Exception $e) {
+            die("Erreur système : " . $e->getMessage());
+        }
+    }
 }
+

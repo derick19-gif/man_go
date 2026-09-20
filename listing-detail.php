@@ -27,7 +27,7 @@ try {
         FROM listings l 
         LEFT JOIN categories c ON l.category_id = c.id 
         LEFT JOIN users u ON l.user_id = u.id
-        WHERE l.id = :id AND l.status = 'active'
+        WHERE l.id = :id AND l.status = 'ACTIVE'
         LIMIT 1
     ");
     $stmt->execute([':id' => $id]);
@@ -43,7 +43,7 @@ try {
     if (!empty($listing['category_id'])) {
         $stmtSimilar = $db->prepare("
             SELECT * FROM listings 
-            WHERE category_id = :cat_id AND id != :current_id AND status = 'active' 
+            WHERE category_id = :cat_id AND id != :current_id AND status = 'ACTIVE' 
             ORDER BY created_at DESC LIMIT 4
         ");
         $stmtSimilar->execute([

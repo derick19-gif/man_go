@@ -17,7 +17,7 @@ class AdminController {
     public function getGlobalStats(): array {
         try {
             $users = (int)$this->db->query("SELECT COUNT(*) FROM users")->fetchColumn();
-            $products = (int)$this->db->query("SELECT COUNT(*) FROM products WHERE status = 'active'")->fetchColumn();
+            $products = (int)$this->db->query("SELECT COUNT(*) FROM products WHERE status = 'ACTIVE'")->fetchColumn();
             $pendingProducts = (int)$this->db->query("SELECT COUNT(*) FROM products WHERE status = 'pending'")->fetchColumn();
             $orders = (int)$this->db->query("SELECT COUNT(*) FROM orders WHERE status = 'completed'")->fetchColumn();
 

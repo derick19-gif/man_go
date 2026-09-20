@@ -1,7 +1,7 @@
 <?php
 // app/views/listings/create.php
 $pageTitle = 'Publier une annonce - MAN GO';
-$baseUrl = defined('BASE_URL') ? BASE_URL : '/man_go';
+$baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
 require_once __DIR__ . '/../layouts/header.php';
 ?>
 
@@ -71,11 +71,11 @@ require_once __DIR__ . '/../layouts/header.php';
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Prix de vente <span class="text-red-500">*</span></label>
-                                <input type="number" step="0.01" min="0" name="price" required class="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-amber-500 text-sm bg-white" placeholder="Ex: 15000">
+                                <input type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" name="price" required class="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-amber-500 text-sm bg-white" placeholder="Ex: 15000">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Prix barré <span class="text-gray-400 font-normal">(Optionnel)</span></label>
-                                <input type="number" step="0.01" min="0" name="original_price" class="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-amber-500 text-sm bg-white" placeholder="Ex: 18000">
+                                <input type="number" inputmode="numeric" pattern="[0-9]*" min="0" step="1" name="original_price" class="w-full px-3 py-2.5 rounded-lg border border-gray-300 focus:outline-none focus:border-amber-500 text-sm bg-white" placeholder="Ex: 18000">
                             </div>
                             <div>
                                 <label class="block text-xs font-bold text-gray-700 mb-1">Devise</label>

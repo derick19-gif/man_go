@@ -41,7 +41,7 @@ try {
 // -------------------------------------------------------------------------
 // 3. CONSTRUCTION DE LA REQUSTE SQL DYNAMIQUE
 // -------------------------------------------------------------------------
-$where = ["l.status = 'active'"];
+$where = ["l.status = 'ACTIVE'"];
 $params = [];
 
 if (!empty($search)) {
@@ -170,7 +170,7 @@ function buildUrl($extraParams = []) {
             <nav class="hidden md:flex space-x-8 text-sm font-medium">
                 <a href="index.php" class="hover:text-amber-500 transition">Accueil</a>
                 <a href="listings.php" class="text-amber-500 font-bold border-b-2 border-amber-500 pb-1">Annonces</a>
-                <a href="<?= BASE_URL ?>/stands" class="hover:text-amber-500 transition">Boutiques & Stands</a>
+                <a href="<?= APP_URL ?>/stands" class="hover:text-amber-500 transition">Boutiques & Stands</a>
                 <a href="services.php" class="hover:text-amber-500 transition">Services</a>
             </nav>
 
@@ -476,3 +476,4 @@ function buildUrl($extraParams = []) {
 
 </body>
 </html>
+
