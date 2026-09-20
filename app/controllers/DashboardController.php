@@ -55,7 +55,7 @@ class DashboardController {
             $stmtStats = $pdo->prepare("
                 SELECT 
                     COUNT(id) AS total_listings,
-                    COALESCE(SUM(CASE WHEN status = 'ACTIVE' THEN 1 ELSE 0 END), 0) AS active_listings,
+                    COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) AS active_listings,
                     COALESCE(SUM(views_count), 0) AS total_views
                 FROM listings 
                 WHERE user_id = :id
@@ -87,7 +87,7 @@ class DashboardController {
             $stmtstands = $pdo->prepare("
                 SELECT id, name, logo, banner, status 
                 FROM stands 
-                WHERE status = 'ACTIVE' 
+                WHERE status = 'active' 
                 ORDER BY RAND() 
                 LIMIT 8
             ");
@@ -116,4 +116,5 @@ class DashboardController {
         require_once __DIR__ . '/../../client/views/dashboard.php';
     }
 }
+
 

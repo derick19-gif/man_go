@@ -26,7 +26,7 @@ class ServiceController extends Controller {
                                     FROM services s 
                                     LEFT JOIN stands st ON s.stand_id = st.id 
                                     LEFT JOIN categories c ON s.category_id = c.id 
-                                    WHERE s.status = 'ACTIVE' 
+                                    WHERE s.status = 'active' 
                                     ORDER BY s.created_at DESC");
                 if ($stmt) {
                     $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -50,7 +50,7 @@ class ServiceController extends Controller {
             $stmt = $db->prepare("SELECT s.*, st.name as stand_name, st.phone as stand_phone, st.email as stand_email 
                                   FROM services s 
                                   LEFT JOIN stands st ON s.stand_id = st.id 
-                                  WHERE s.id = ? AND s.status = 'ACTIVE'");
+                                  WHERE s.id = ? AND s.status = 'active'");
             $stmt->execute([$id]);
             $service = $stmt->fetch(PDO::FETCH_ASSOC);
         }
@@ -67,3 +67,4 @@ class ServiceController extends Controller {
         ]);
     }
 }
+

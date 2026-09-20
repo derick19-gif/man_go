@@ -98,7 +98,7 @@ try {
     $stmtstands = $pdo->prepare("
         SELECT id, name, logo, banner, status 
         FROM stands 
-        WHERE status = 'ACTIVE' 
+        WHERE status = 'active' 
         ORDER BY RAND() 
         LIMIT 8
     ");
@@ -635,3 +635,4 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
     </script>
 </body>
 </html>
+

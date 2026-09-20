@@ -60,7 +60,7 @@ class HomeController {
 
         try {
             // CORRECTION CRUCIALE ICI : On cherche 'ACTIF' en MAJUSCULES, comme dans la base de données
-            $whereConditions = ["l.status = 'ACTIVE'"];
+            $whereConditions = ["l.status = 'active'"];
             $params = [];
 
             if (!empty($search_query)) {
@@ -150,3 +150,4 @@ class HomeController {
         }
     }
 }
+

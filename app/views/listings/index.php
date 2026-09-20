@@ -41,7 +41,7 @@ try {
 // -------------------------------------------------------------------------
 // 3. CONSTRUCTION DE LA REQUSTE SQL DYNAMIQUE
 // -------------------------------------------------------------------------
-$where = ["l.status = 'ACTIVE'"];
+$where = ["l.status = 'active'"];
 $params = [];
 
 if (!empty($search)) {
@@ -476,4 +476,5 @@ function buildUrl($extraParams = []) {
 
 </body>
 </html>
+
 

@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $db = \App\Core\Database::connect();
         
         // SÉCURITÉ ABSOLUE : On vérifie si le vendeur possède un Stand ACTIF
-        $stmtStand = $db->prepare("SELECT id FROM stands WHERE user_id = :user_id AND status = 'ACTIVE' LIMIT 1");
+        $stmtStand = $db->prepare("SELECT id FROM stands WHERE user_id = :user_id AND status = 'active' LIMIT 1");
         $stmtStand->execute([':user_id' => $_SESSION['user_id']]);
         $stand = $stmtStand->fetch(PDO::FETCH_ASSOC);
         
@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 $stmt = $db->prepare("
                     INSERT INTO listings (user_id, stand_id, category_id, title, slug, price, description, web_link, image_path, status, created_at) 
-                    VALUES (:user_id, :stand_id, :category_id, :title, :slug, :price, :description, :web_link, :image_path, 'ACTIVE', NOW())
+                    VALUES (:user_id, :stand_id, :category_id, :title, :slug, :price, :description, :web_link, :image_path, 'active', NOW())
                 ");
                 
                 $stmt->execute([
@@ -220,3 +220,4 @@ $footerPath = __DIR__ . '/themes/default/templates/layouts/footer.php';
 if (!file_exists($footerPath)) $footerPath = __DIR__ . '/app/views/layouts/footer.php';
 if (file_exists($footerPath)) require_once $footerPath;
 ?>
+

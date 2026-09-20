@@ -245,7 +245,7 @@ class ListingController {
                 FROM listings l
                 LEFT JOIN categories c ON l.category_id = c.id
                 LEFT JOIN users u ON l.user_id = u.id
-                WHERE l.id = :id AND l.status = 'ACTIVE'
+                WHERE l.id = :id AND l.status = 'active'
             ");
             $stmt->execute([':id' => $id]);
             $listing = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -272,4 +272,5 @@ class ListingController {
         }
     }
 }
+
 

@@ -32,7 +32,7 @@ class Stand extends Model {
 
     public function getStandListings($stand_id) {
         if (!$this->db) return [];
-        $stmt = $this->db->prepare("SELECT * FROM listings WHERE stand_id = :stand_id AND status = 'ACTIVE' ORDER BY created_at DESC");
+        $stmt = $this->db->prepare("SELECT * FROM listings WHERE stand_id = :stand_id AND status = 'active' ORDER BY created_at DESC");
         $stmt->execute([':stand_id' => $stand_id]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
@@ -45,7 +45,7 @@ class Stand extends Model {
 
         // ATTENTION : On s'assure que le statut est bien 'ACTIVE' en majuscules
         // car votre base de données utilise un ENUM('PENDING', 'ACTIVE', 'SUSPENDED')
-        $sql = "SELECT s.*, u.name as vendor_name FROM {$this->table} s LEFT JOIN users u ON s.user_id = u.id WHERE s.status = 'ACTIVE'";
+        $sql = "SELECT s.*, u.name as vendor_name FROM {$this->table} s LEFT JOIN users u ON s.user_id = u.id WHERE s.status = 'active'";
         $params = [];
 
         // Filtre par mot-clé (Nom ou Description)
@@ -113,3 +113,4 @@ class Stand extends Model {
         }
     }
 }
+

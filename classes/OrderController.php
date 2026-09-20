@@ -18,7 +18,7 @@ class OrderController {
             FROM products p
             LEFT JOIN users u ON p.user_id = u.id
             LEFT JOIN categories c ON p.category_id = c.id
-            WHERE p.id = :id AND p.status = 'ACTIVE'
+            WHERE p.id = :id AND p.status = 'active'
             LIMIT 1
         ");
         $stmt->execute([':id' => $productId]);
@@ -104,3 +104,4 @@ class OrderController {
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 }
+

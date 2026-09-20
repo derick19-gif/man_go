@@ -4,6 +4,7 @@
 // =========================================================================
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/core/Session.php';
+require_once __DIR__ . '/core/Database.php';
 use App\Core\Database;
 
 Session::init();
@@ -47,7 +48,7 @@ try {
 // =========================================================================
 // 4. CONSTRUCTION DE LA REQUÊTE SQL DYNAMIQUE (Le Moteur de Recherche)
 // =========================================================================
-$where = ["l.status = 'ACTIVE'"];
+$where = ["l.status = 'active'"];
 $params = [];
 
 if (!empty($search)) {
@@ -418,3 +419,6 @@ require_once __DIR__ . '/app/views/layouts/header.php';
 // Chargement du Footer unifié
 require_once __DIR__ . '/app/views/layouts/footer.php'; 
 ?>
+
+
+
