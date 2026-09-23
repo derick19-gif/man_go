@@ -24,6 +24,11 @@ if ($sessionClass) {
 
 // 3. Routage dynamique
 $dashboardLink = ($userRole === 'vendor') ? $baseUrl . '/vendor_dir/dashboard.php' : $baseUrl . '/client/views/dashboard.php';
+
+// 4. Condition pour afficher le bouton Publier
+// On l'affiche SI l'utilisateur n'est PAS connecté, OU SI c'est un vendeur. 
+// On le CACHE pour les acheteurs purs et les admins.
+$showPublishButton = (!$isLoggedIn || $userRole === 'vendor' || $userRole === 'vendeur');
 ?>
 <!DOCTYPE html>
 <html lang="fr" class="h-full">
@@ -51,6 +56,10 @@ $dashboardLink = ($userRole === 'vendor') ? $baseUrl . '/vendor_dir/dashboard.ph
         .nav-link-futuristic { position: relative; }
         .nav-link-futuristic::after { content: ''; position: absolute; width: 0; height: 2px; bottom: -4px; left: 0; background-color: #f59e0b; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         .nav-link-futuristic:hover::after { width: 100%; }
+        
+        /* Cacher la barre de défilement mais garder le fonctionnement du swipe */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="bg-slate-950 text-gray-100 flex flex-col min-h-screen font-sans antialiased selection:bg-amber-500 selection:text-slate-950">
@@ -68,7 +77,7 @@ $dashboardLink = ($userRole === 'vendor') ? $baseUrl . '/vendor_dir/dashboard.ph
         
         <nav class="hidden md:flex items-center space-x-8 text-sm font-semibold text-slate-300">
             <a href="<?= $baseUrl ?>/" class="nav-link-futuristic hover:text-amber-400 transition py-1">Accueil</a>
-            <a href="<?= $baseUrl ?>/listings" class="nav-link-futuristic hover:text-amber-400 transition py-1">Annonces</a>
+            <a href="<?= $baseUrl ?>/listings.php" class="nav-link-futuristic hover:text-amber-400 transition py-1">Annonces</a>
             <a href="<?= $baseUrl ?>/stands" class="nav-link-futuristic hover:text-amber-400 transition py-1">Boutiques & Stands</a>
             <a href="<?= $baseUrl ?>/services" class="nav-link-futuristic hover:text-amber-400 transition py-1">Services</a>
         </nav>
@@ -77,8 +86,8 @@ $dashboardLink = ($userRole === 'vendor') ? $baseUrl . '/vendor_dir/dashboard.ph
             <?php if ($isLoggedIn): ?>
                 <!-- Bouton Mon Compte / Espace Pro -->
                 <a href="<?= $dashboardLink ?>" class="text-sm font-bold text-slate-200 hover:text-amber-400 transition flex items-center space-x-2 bg-slate-800/50 px-4 py-2 rounded-full border border-slate-700/50">
-                    <i class="fa-solid <?= ($userRole === 'vendor') ? 'fa-store' : 'fa-user' ?> text-amber-500"></i>
-                    <span><?= ($userRole === 'vendor') ? 'Espace Pro' : 'Mon Compte' ?></span>
+                    <i class="fa-solid <?= ($userRole === 'vendor' || $userRole === 'vendeur') ? 'fa-store' : 'fa-user' ?> text-amber-500"></i>
+                    <span><?= ($userRole === 'vendor' || $userRole === 'vendeur') ? 'Espace Pro' : 'Mon Compte' ?></span>
                 </a>
                 <!-- Bouton Déconnexion -->
                 <a href="<?= $baseUrl ?>/logout.php" class="text-xs font-bold text-red-400 hover:text-red-300 p-2.5 rounded-full hover:bg-red-500/10 transition" title="Déconnexion">
@@ -90,10 +99,12 @@ $dashboardLink = ($userRole === 'vendor') ? $baseUrl . '/vendor_dir/dashboard.ph
                 <a href="<?= $baseUrl ?>/register.php" class="text-sm font-bold text-amber-400 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-5 py-2.5 rounded-full transition shadow-sm">Inscription</a>
             <?php endif; ?>
 
-            <!-- L'UNIQUE BOUTON PUBLIER -->
-            <a href="<?= $baseUrl ?>/publish.php" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold px-5 py-2.5 rounded-full text-sm transition-all duration-300 shadow-futuristic flex items-center space-x-2 transform hover:-translate-y-0.5">
-                <i class="fa-solid fa-plus-circle"></i><span>Publier</span>
-            </a>
+            <!-- LE BOUTON PUBLIER (Affiché conditionnellement) -->
+            <?php if($showPublishButton): ?>
+                <a href="<?= $baseUrl ?>/publish.php" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold px-5 py-2.5 rounded-full text-sm transition-all duration-300 shadow-futuristic flex items-center space-x-2 transform hover:-translate-y-0.5">
+                    <i class="fa-solid fa-plus-circle"></i><span>Publier</span>
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 </header>

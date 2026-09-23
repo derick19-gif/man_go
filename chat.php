@@ -1,20 +1,33 @@
 <?php
+// chat.php (Interface de Messagerie)
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/core/Autoloader.php';
 require_once __DIR__ . '/core/Database.php';
+require_once __DIR__ . '/core/Session.php';
 
+// ON UTILISE VOTRE CLASSE SESSION SECURISEE
 Session::init();
 
-if (!Session::isAuthenticated()) {
+if (Session::isAuthenticated() === false) {
     header('Location: login.php');
     exit;
 }
 
-$current_user_id = Session::get('user_id');
-$baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
-
-// Si on arrive depuis une annonce avec un ID spécifique
+$current_user_id = Session::getUserId();$baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
 $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
+$userRole = Session::get('user_role');
+
+// Définition de l'URL de retour selon le rôle
+$returnUrl =$baseUrl . '/client/views/dashboard.php';
+if ($userRole === 'vendor') {
+    $returnUrl =$baseUrl . '/vendor_dir/dashboard.php';
+}
+if ($userRole === 'vendeur') {
+    $returnUrl =$baseUrl . '/vendor_dir/dashboard.php';
+}
+if ($userRole === 'admin') {
+    $returnUrl =$baseUrl . '/admin/dashboard.php';
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr">
@@ -27,24 +40,28 @@ $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
     <style>
         :root { --mango-orange: #f59e0b; --mango-dark: #0f172a; --chat-bg: #f8fafc; }
         body { background-color: #f1f5f9; height: 100vh; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
-        .chat-container { height: calc(100vh - 40px); margin-top: 20px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); overflow: hidden; }
-        .inbox-sidebar { border-right: 1px solid #e2e8f0; height: 100%; display: flex; flex-direction: column; }
-        .inbox-header { padding: 16px; background-color: #fff; border-bottom: 1px solid #e2e8f0; }
+        .chat-container { height: calc(100vh - 40px); margin-top: 20px; background: #ffffff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e2e8f0; }
+        .inbox-sidebar { border-right: 1px solid #e2e8f0; height: 100%; display: flex; flex-direction: column; background: #fff; }
+        .inbox-header { padding: 20px; background-color: #fff; border-bottom: 1px solid #f1f5f9; }
         .inbox-list { flex: 1; overflow-y: auto; }
-        .conversation-item { padding: 14px 16px; border-bottom: 1px solid #f1f5f9; cursor: pointer; transition: background 0.2s; }
-        .conversation-item:hover, .conversation-item.active { background-color: #f8fafc; }
-        .conversation-item.active { border-left: 4px solid var(--mango-orange); }
-        .avatar-circle { width: 45px; height: 45px; border-radius: 50%; background-color: var(--mango-orange); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; }
-        .chat-main { height: 100%; display: flex; flex-direction: column; background-color: var(--chat-bg); }
-        .chat-header { padding: 16px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
-        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
-        .message-bubble { max-width: 65%; padding: 10px 14px; border-radius: 14px; font-size: 0.95rem; position: relative; word-wrap: break-word; }
-        .message-sent { align-self: flex-end; background-color: var(--mango-orange); color: #ffffff; border-bottom-right-radius: 2px; }
-        .message-received { align-self: flex-start; background-color: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-bottom-left-radius: 2px; }
-        .message-time { font-size: 0.7rem; margin-top: 4px; opacity: 0.75; text-align: right; }
-        .chat-input-area { padding: 16px; background: #ffffff; border-top: 1px solid #e2e8f0; }
-        .badge-label { font-size: 0.75rem; padding: 3px 8px; border-radius: 10px; }
-        .shield-notice { background-color: #fff7ed; border: 1px solid #ffedd5; color: #c2410c; padding: 8px 12px; font-size: 0.8rem; border-radius: 6px; margin-bottom: 10px; }
+        .conversation-item { padding: 16px 20px; border-bottom: 1px solid #f8fafc; cursor: pointer; transition: background 0.2s; }
+        .conversation-item:hover { background-color: #f8fafc; }
+        .conversation-item.active { background-color: #fffbeb; border-left: 4px solid var(--mango-orange); }
+        .avatar-circle { width: 48px; height: 48px; border-radius: 50%; background-color: var(--mango-dark); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; }
+        .chat-main { height: 100%; display: flex; flex-direction: column; background-image: url('https://www.transparenttextures.com/patterns/cubes.png'); background-color: var(--chat-bg); }
+        .chat-header { padding: 16px 24px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.02); z-index: 10; }
+        .chat-messages { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+        .message-bubble { max-width: 70%; padding: 12px 16px; border-radius: 16px; font-size: 0.95rem; position: relative; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .message-sent { align-self: flex-end; background-color: var(--mango-dark); color: #ffffff; border-bottom-right-radius: 4px; }
+        .message-received { align-self: flex-start; background-color: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; }
+        .message-time { font-size: 0.7rem; margin-top: 6px; display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+        .message-sent .message-time { color: rgba(255,255,255,0.7); }
+        .message-received .message-time { color: #94a3b8; }
+        .chat-input-area { padding: 20px; background: #ffffff; border-top: 1px solid #e2e8f0; }
+        .shield-notice { background-color: #fffbeb; border: 1px solid #fef3c7; color: #d97706; padding: 10px 14px; font-size: 0.85rem; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; }
+        .tick-sent { color: #94a3b8; } 
+        .tick-read { color: #3b82f6; } 
+        
         @media (max-width: 768px) {
             .inbox-sidebar { display: block; }
             .chat-main { display: none; }
@@ -54,8 +71,8 @@ $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
 </head>
 <body>
 
-<a href="<?= $baseUrl ?>/" class="btn btn-dark position-absolute" style="top: 15px; left: 15px; z-index: 1000; border-radius: 50px;">
-    <i class="fa-solid fa-arrow-left"></i> Retour au site
+<a href="<?= $returnUrl ?>" class="btn btn-dark position-absolute shadow" style="top: 20px; left: 20px; z-index: 1000; border-radius: 50px;">
+    <i class="fa-solid fa-arrow-left me-2"></i> Tableau de bord
 </a>
 
 <div class="container-fluid h-100">
@@ -63,82 +80,56 @@ $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
         <div class="col-12 col-xl-10 h-100">
             <div class="row chat-container g-0">
                 
-                <!-- SIDEBAR INBOX -->
                 <div class="col-12 col-md-4 inbox-sidebar" id="inboxSidebar">
                     <div class="inbox-header text-center pt-5">
-                        <h5 class="m-0 fw-bold"><i class="fa-solid fa-shield-halved text-warning me-2"></i>MAN GO Shield</h5>
-                        <small class="text-muted">Messagerie sécurisée</small>
+                        <div class="d-inline-flex align-items-center justify-content-center w-12 h-12 rounded-circle bg-warning bg-opacity-10 text-warning mb-2 p-3">
+                            <i class="fa-solid fa-shield-halved fa-2x"></i>
+                        </div>
+                        <h5 class="m-0 fw-black">MAN GO Shield</h5>
+                        <small class="text-muted fw-bold">Messagerie 100% Sécurisée</small>
                     </div>
                     <div class="inbox-list" id="inboxList">
-                        <div class="text-center p-4 text-muted">
-                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-                            Chargement des discussions...
+                        <div class="text-center p-5 text-muted">
+                            <div class="spinner-border spinner-border-sm text-warning me-2" role="status"></div>
+                            Chargement...
                         </div>
                     </div>
                 </div>
 
-                <!-- MAIN CHAT AREA -->
                 <div class="col-12 col-md-8 chat-main" id="chatMain">
                     
-                    <!-- Chat Header -->
                     <div class="chat-header" id="chatHeader" style="display: none;">
                         <div class="d-flex align-items-center gap-3">
-                            <button class="btn btn-sm btn-light d-md-none" onclick="closeChatMobile()"><i class="fa-solid fa-arrow-left"></i></button>
-                            <div class="avatar-circle" id="activeAvatar">U</div>
+                            <button class="btn btn-sm btn-light d-md-none rounded-circle" onclick="closeChatMobile()"><i class="fa-solid fa-arrow-left"></i></button>
+                            <div class="avatar-circle bg-warning text-dark" id="activeAvatar">U</div>
                             <div>
-                                <h6 class="m-0 fw-bold" id="activeContactName">Utilisateur</h6>
-                                <span class="badge bg-secondary badge-label" id="activeLabel">Aucun label</span>
+                                <h5 class="m-0 fw-bold text-dark" id="activeContactName">Utilisateur</h5>
+                                <small class="text-success fw-bold"><i class="fa-solid fa-circle text-success" style="font-size: 0.5rem; margin-right:4px;"></i> En ligne</small>
                             </div>
-                        </div>
-                        
-                        <!-- Menu des Labels -->
-                        <div class="dropdown">
-                            <button class="btn btn-outline-secondary btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                <i class="fa-solid fa-tag me-1"></i> Étiquette
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a class="dropdown-item" href="#" onclick="setChatLabel('Prospect')">🎯 Prospect</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="setChatLabel('En négociation')">🤝 En négociation</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="setChatLabel('Payé / Vendu')">✅ Payé / Vendu</a></li>
-                                <li><a class="dropdown-item" href="#" onclick="setChatLabel('Urgent')">⚠️ Urgent</a></li>
-                            </ul>
                         </div>
                     </div>
 
-                    <!-- Messages Container -->
                     <div class="chat-messages" id="chatMessages">
                         <div class="text-center my-auto text-muted">
-                            <i class="fa-solid fa-comments fa-3x mb-3 text-secondary"></i>
-                            <h6>Sélectionnez une conversation pour démarrer</h6>
+                            <div class="bg-white p-4 rounded-circle shadow-sm d-inline-block mb-3">
+                                <i class="fa-solid fa-comments fa-3x text-warning"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark">Vos messages s'affichent ici</h5>
+                            <p class="small">Sélectionnez une conversation dans le menu de gauche.</p>
                         </div>
                     </div>
 
-                    <!-- Input Form -->
                     <div class="chat-input-area" id="chatInputArea" style="display: none;">
-                        <div class="shield-notice">
-                            <i class="fa-solid fa-lock me-1"></i> <strong>Protection MAN GO :</strong> Les numéros, liens et mots inappropriés sont filtrés.
-                        </div>
-
-                        <!-- Bar d'outils réponses rapides -->
-                        <div class="d-flex align-items-center mb-2 gap-2">
-                            <button class="btn btn-sm btn-light border" onclick="toggleQuickReplies()">
-                                <i class="fa-solid fa-bolt text-warning me-1"></i> Réponses rapides
-                            </button>
-                        </div>
-
-                        <!-- Tiroir Réponses Rapides -->
-                        <div id="quickRepliesBox" class="p-2 mb-2 bg-light border rounded" style="display: none;">
-                            <small class="text-muted d-block mb-1">Cliquer pour insérer :</small>
-                            <div id="quickRepliesList" class="d-flex flex-wrap gap-1">
-                                <!-- Injecté par JS -->
-                            </div>
+                        <div class="shield-notice shadow-sm">
+                            <i class="fa-solid fa-lock text-warning me-2 fa-lg"></i> 
+                            <div><strong>Sécurité active :</strong> Les numéros, liens externes et mots inappropriés sont filtrés automatiquement.</div>
                         </div>
 
                         <form id="sendMessageForm" onsubmit="handleSendMessage(event)">
-                            <div class="input-group">
-                                <input type="text" id="messageInput" class="form-control" placeholder="Écrivez votre message..." autocomplete="off" required>
-                                <button class="btn text-white" style="background-color: var(--mango-orange); border:none;" type="submit">
-                                    <i class="fa-solid fa-paper-plane"></i>
+                            <div class="input-group shadow-sm rounded-pill p-1 bg-white border border-secondary border-opacity-25">
+                                <input type="text" id="messageInput" class="form-control border-0 bg-transparent shadow-none px-4" placeholder="Écrivez votre message en toute sécurité..." autocomplete="off" required>
+                                <button class="btn text-white rounded-pill px-4 fw-bold transition" style="background-color: var(--mango-orange);" type="submit" id="sendBtn">
+                                    <i class="fa-solid fa-paper-plane me-1"></i> Envoyer
                                 </button>
                             </div>
                         </form>
@@ -159,12 +150,17 @@ $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
 
     document.addEventListener('DOMContentLoaded', () => {
         loadInbox();
-        loadQuickReplies();
-        setInterval(loadInbox, 5000);
+        setInterval(loadInbox, 3000); 
 
-        // Si l'utilisateur vient d'une annonce, on ouvre le chat automatiquement
-        if (URL_VENDOR_ID && URL_VENDOR_ID != CURRENT_USER_ID) {
-            openChat(URL_VENDOR_ID, "Utilisateur #" + URL_VENDOR_ID);
+        if (URL_VENDOR_ID) {
+            if (URL_VENDOR_ID !== CURRENT_USER_ID) {
+                setTimeout(() => {
+                    openChat(URL_VENDOR_ID, "Nouvelle Discussion");
+                    document.getElementById('chatHeader').style.display = 'flex';
+                    document.getElementById('chatInputArea').style.display = 'block';
+                    document.getElementById('chatMain').classList.add('active');
+                }, 200);
+            }
         }
     });
 
@@ -172,34 +168,47 @@ $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
         try {
             const response = await fetch('api/chat.php?action=inbox');
             const conversations = await response.json();
-            
             const inboxList = document.getElementById('inboxList');
-            if (conversations.length === 0) {
-                inboxList.innerHTML = `<div class="text-center p-4 text-muted">Aucune conversation.</div>`;
+            
+            let isEmpty = false;
+            if (conversations == null) { isEmpty = true; }
+            if (conversations && conversations.length === 0) { isEmpty = true; }
+            
+            if (isEmpty) {
+                inboxList.innerHTML = `<div class="text-center p-5 text-muted"><i class="fa-solid fa-inbox fa-2x mb-3 text-light"></i><br>Aucune conversation.</div>`;
                 return;
             }
 
             let html = '';
             conversations.forEach(conv => {
-                const isActive = conv.contact_id == activeReceiverId ? 'active' : '';
-                const contactName = conv.firstname ? `${conv.firstname} ${conv.lastname}` : `Utilisateur #${conv.contact_id}`;
+                const isActive = (conv.contact_id == activeReceiverId) ? 'active' : '';
+                
+                let fName = conv.firstname ? conv.firstname : '';
+                let lName = conv.lastname ? conv.lastname : '';
+                let cName = (fName + ' ' + lName).trim();
+                
+                const contactName = cName !== '' ? cName : 'Utilisateur #' + conv.contact_id;
                 const initial = contactName.charAt(0).toUpperCase();
-                const unreadBadge = (conv.is_read == 0 && conv.receiver_id == CURRENT_USER_ID) ? '<span class="badge bg-danger rounded-pill">Nouveau</span>' : '';
-                const labelHtml = conv.label ? `<span class="badge bg-info badge-label">${escapeHtml(conv.label)}</span>` : '';
+                
+                let unreadBadge = '';
+                if (conv.is_read == 0) {
+                    if (conv.receiver_id == CURRENT_USER_ID) {
+                        unreadBadge = '<span class="badge bg-danger rounded-pill shadow-sm">Nouveau</span>';
+                    }
+                }
 
                 html += `
-                    <div class="conversation-item ${isActive}" onclick="openChat(${conv.contact_id}, '${escapeHtml(contactName)}', '${escapeHtml(conv.label || '')}')">
+                    <div class="conversation-item ${isActive}" onclick="openChat(${conv.contact_id}, '${escapeHtml(contactName)}')">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="avatar-circle">${initial}</div>
+                            <div class="avatar-circle shadow-sm">${initial}</div>
                             <div class="flex-grow-1 overflow-hidden">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h6 class="m-0 fw-bold text-truncate">${escapeHtml(contactName)}</h6>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <h6 class="m-0 fw-bold text-dark text-truncate">${escapeHtml(contactName)}</h6>
                                     <small class="text-muted" style="font-size:0.7rem;">${formatTime(conv.created_at)}</small>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center mt-1">
-                                    <p class="m-0 text-muted text-truncate" style="font-size: 0.85rem;">${escapeHtml(conv.message)}</p>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <p class="m-0 text-muted text-truncate" style="font-size: 0.85rem; ${unreadBadge !== '' ? 'font-weight:bold; color:#0f172a;' : ''}">${escapeHtml(conv.message)}</p>
                                     ${unreadBadge}
-                                    ${labelHtml}
                                 </div>
                             </div>
                         </div>
@@ -210,7 +219,7 @@ $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
         } catch (error) { console.error('Erreur chargement inbox:', error); }
     }
 
-    function openChat(receiverId, contactName, label = '') {
+    function openChat(receiverId, contactName) {
         activeReceiverId = receiverId;
         
         document.getElementById('chatHeader').style.display = 'flex';
@@ -219,11 +228,9 @@ $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
         document.getElementById('activeContactName').innerText = contactName;
         document.getElementById('activeAvatar').innerText = contactName.charAt(0).toUpperCase();
         
-        updateLabelBadge(label);
-        
         loadMessages();
         if (pollInterval) clearInterval(pollInterval);
-        pollInterval = setInterval(loadMessages, 3000);
+        pollInterval = setInterval(loadMessages, 2000); 
         loadInbox();
     }
 
@@ -233,108 +240,122 @@ $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
             const response = await fetch(`api/chat.php?action=get&receiver_id=${activeReceiverId}`);
             const messages = await response.json();
             const messagesContainer = document.getElementById('chatMessages');
+            
+            const isScrolledToBottom = messagesContainer.scrollHeight - messagesContainer.clientHeight <= messagesContainer.scrollTop + 50;
+            
+            let isMsgEmpty = false;
+            if (messages == null) { isMsgEmpty = true; }
+            if (messages && messages.length === 0) { isMsgEmpty = true; }
+
+            if (isMsgEmpty) {
+                if(messagesContainer.innerHTML.indexOf('fa-handshake') === -1) {
+                    messagesContainer.innerHTML = `
+                        <div class="text-center my-auto text-muted pt-5">
+                            <div class="bg-white p-4 rounded-circle shadow-sm d-inline-block mb-3">
+                                <i class="fa-solid fa-handshake fa-3x text-warning"></i>
+                            </div>
+                            <h5 class="fw-bold text-dark">Nouvelle discussion</h5>
+                            <p class="small">Envoyez un premier message pour démarrer l'échange.</p>
+                        </div>`;
+                }
+                return;
+            }
+
             let html = '';
 
             messages.forEach(msg => {
-                const isSent = msg.sender_id == CURRENT_USER_ID;
+                const isSent = (msg.sender_id == CURRENT_USER_ID);
                 const bubbleClass = isSent ? 'message-sent' : 'message-received';
+                
+                let readStatus = '';
+                if (isSent) {
+                    if (msg.is_read == 1) {
+                        readStatus = '<i class="fa-solid fa-check-double tick-read ms-2" title="Lu"></i>';
+                    } else {
+                        readStatus = '<i class="fa-solid fa-check tick-sent ms-2" title="Envoyé"></i>';
+                    }
+                }
+
+                let deleteBtn = '';
+                if (isSent) {
+                    if (msg.message.indexOf('🚫') === -1) {
+                        deleteBtn = `<i class="fa-solid fa-trash ms-3 cursor-pointer opacity-50 hover:opacity-100 transition" style="cursor:pointer;" onclick="deleteMessage(${msg.id})" title="Supprimer"></i>`;
+                    }
+                }
+
                 html += `
-                    <div class="message-bubble ${bubbleClass}">
-                        <div>${escapeHtml(msg.message)}</div>
-                        <div class="message-time">${formatTime(msg.created_at)}</div>
+                    <div class="message-bubble ${bubbleClass} d-flex flex-column shadow-sm" id="msg-${msg.id}">
+                        <div>${msg.message}</div>
+                        <div class="message-time">
+                            <span>${formatTime(msg.created_at)}</span>
+                            ${readStatus}
+                            ${deleteBtn}
+                        </div>
                     </div>
                 `;
             });
             messagesContainer.innerHTML = html;
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        } catch (error) {}
+            
+            if (isScrolledToBottom) {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+        } catch (error) { console.error("Erreur messages:", error); }
     }
 
     async function handleSendMessage(event) {
         event.preventDefault();
         const input = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
         const message = input.value.trim();
-        if (!message || !activeReceiverId) return;
+        
+        if (!message) return;
+        if (!activeReceiverId) return;
+
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i>';
 
         const formData = new FormData();
         formData.append('action', 'send');
         formData.append('receiver_id', activeReceiverId);
         formData.append('message', message);
+        
         input.value = '';
 
         try {
             const response = await fetch('api/chat.php', { method: 'POST', body: formData });
             const result = await response.json();
             if (result.status === 'success') {
-                loadMessages();
+                await loadMessages();
+                const messagesContainer = document.getElementById('chatMessages');
+                messagesContainer.scrollTop = messagesContainer.scrollHeight; 
                 loadInbox();
+            } else {
+                alert(result.message ? result.message : "Erreur lors de l'envoi.");
+            }
+        } catch (error) { console.error(error); }
+        
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="fa-solid fa-paper-plane me-1"></i> Envoyer';
+        input.focus();
+    }
+
+    async function deleteMessage(msgId) {
+        if (!confirm("Voulez-vous vraiment supprimer ce message pour tout le monde ?")) return;
+        
+        try {
+            const formData = new FormData();
+            formData.append('action', 'delete');
+            formData.append('id', msgId);
+
+            const response = await fetch('api/chat.php', { method: 'POST', body: formData });
+            const result = await response.json();
+            
+            if (result.status === 'success') {
+                loadMessages(); 
             } else {
                 alert(result.message);
             }
-        } catch (error) {}
-    }
-
-    async function setChatLabel(label) {
-        if (!activeReceiverId) return;
-        const formData = new FormData();
-        formData.append('action', 'setLabel');
-        formData.append('chat_id', activeReceiverId);
-        formData.append('label', label);
-
-        try {
-            const response = await fetch('api/chat.php', { method: 'POST', body: formData });
-            const result = await response.json();
-            if (result.status === 'success') {
-                updateLabelBadge(label);
-                loadInbox();
-            }
-        } catch (error) {}
-    }
-
-    async function loadQuickReplies() {
-        try {
-            const response = await fetch('api/chat.php?action=getQuickReplies');
-            const replies = await response.json();
-            const listContainer = document.getElementById('quickRepliesList');
-            
-            if (!replies || replies.length === 0) {
-                listContainer.innerHTML = `<span class="text-muted" style="font-size:0.8rem;">Aucun raccourci configuré.</span>`;
-                return;
-            }
-
-            let html = '';
-            replies.forEach(r => {
-                html += `
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="insertQuickReply('${escapeHtml(r.message)}')">
-                        <strong>${escapeHtml(r.shortcut)}</strong>
-                    </button>
-                `;
-            });
-            listContainer.innerHTML = html;
-        } catch (error) {}
-    }
-
-    function toggleQuickReplies() {
-        const box = document.getElementById('quickRepliesBox');
-        box.style.display = box.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function insertQuickReply(text) {
-        const input = document.getElementById('messageInput');
-        input.value = text;
-        input.focus();
-        toggleQuickReplies();
-    }
-
-    function updateLabelBadge(label) {
-        const badge = document.getElementById('activeLabel');
-        if (label) {
-            badge.innerText = label;
-            badge.className = 'badge bg-primary badge-label';
-        } else {
-            badge.innerText = 'Aucun label';
-            badge.className = 'badge bg-secondary badge-label';
-        }
+        } catch (error) { console.error("Erreur suppression:", error); }
     }
 
     function closeChatMobile() {
@@ -350,7 +371,7 @@ $vendor_id = isset($_GET['vendor_id']) ? (int)$_GET['vendor_id'] : null;
     function formatTime(dateTimeStr) {
         if (!dateTimeStr) return '';
         const date = new Date(dateTimeStr);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     }
 </script>
 </body>

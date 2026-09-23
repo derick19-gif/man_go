@@ -36,9 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($identifier) || empty($password)) {
         $error = "Veuillez remplir tous les champs.";
     } else {
-        $db = function_exists('getDBConnection') ? getDBConnection() : Database::getInstance();
-
+        // CORRECTION 1 : Connexion à la BDD uniforme avec le reste du site
         try {
+            $db = \App\Core\Database::connect();
+            
             if (!filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
                 $cleanPhone = preg_replace('/[^0-9+]/', '', $identifier);
                 
@@ -74,9 +75,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } else {
                     $userName = $user['full_name'] ?? $user['name'] ?? $user['firstname'] ?? explode('@', $user['email'])[0];
 
-                    // 1. On vérifie l'ID du rôle dans la base (4 = Vendeur, 5 = Acheteur)
-                    $roleId = (int) ($user['role_id'] ?? 5);
-                    $roleStr = ($roleId === 4) ? 'vendor' : 'buyer'; // On le traduit en texte pour la session
+                    // CORRECTION 2 : Logique de rôle stricte
+                    $roleId = (int) ($user['role_id'] ?? 5); // 5 par défaut = Acheteur
+                    
+                    if ($roleId === 4) {
+                        $roleStr = 'vendor';
+                        $redirectUrl = 'vendor_dir/dashboard.php';
+                    } elseif ($roleId === 1 || $roleId === 2) {
+                        $roleStr = 'admin';
+                        $redirectUrl = 'admin/dashboard.php';
+                    } else {
+                        $roleStr = 'buyer';
+                        $redirectUrl = 'client/views/dashboard.php';
+                    }
 
                     Session::create([
                         'user_id'    => (int) $user['id'],
@@ -91,16 +102,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         ]
                     ]);
 
-                    // 2. Redirection parfaite selon le rôle et l'arborescence
-                    if ($roleId === 4) {
-                        $redirectUrl = 'vendor_dir/dashboard.php';
-                    } elseif ($roleId === 1 || $roleId === 2) {
-                        $redirectUrl = 'admin/dashboard.php';
-                    } else {
-                        // Acheteur : on le renvoie vers son espace client
-                        $redirectUrl = 'client/views/dashboard.php';
-                    }
-                    
                     header('Location: ' . $redirectUrl);
                     exit;
                 }
@@ -132,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <span class="font-extrabold text-2xl tracking-tight text-white">MAN <span class="text-[#F59E0B]">GO</span></span>
         </a>
         <div>
-            <span class="text-slate-400 text-sm mr-2">Pas encore de compte ?</span>
+            <span class="text-slate-400 text-sm mr-2 hidden sm:inline">Pas encore de compte ?</span>
             <a href="register.php" class="text-[#F59E0B] hover:underline font-semibold text-sm transition-colors">S'inscrire</a>
         </div>
     </header>

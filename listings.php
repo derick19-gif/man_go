@@ -35,7 +35,7 @@ $offset = ($page - 1) * $limit;
 // 3. RÉCUPÉRATION DES DONNÉES POUR LES FILTRES (Catégories & Villes)
 // =========================================================================
 try {
-    $stmtCats = $db->query("SELECT id, name, slug FROM categories ORDER BY name ASC");
+    $stmtCats = $db->query("SELECT id, name_key AS name, slug FROM categories ORDER BY name_key ASC");
     $categoriesList = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
 
     $stmtLocs = $db->query("SELECT DISTINCT location FROM listings WHERE location IS NOT NULL AND location != '' ORDER BY location ASC");
@@ -100,7 +100,7 @@ try {
 
     $totalPages = max(1, ceil($totalListings / $limit));
 
-    $sql = "SELECT l.*, c.name AS category_name, c.slug AS category_slug 
+    $sql = "SELECT l.*, c.name_key AS category_name, c.slug AS category_slug 
             FROM listings l 
             LEFT JOIN categories c ON l.category_id = c.id 
             WHERE {$whereSQL} 
@@ -117,9 +117,7 @@ try {
     $stmt->execute();
     $listings = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-} catch (Exception $e) {
-    $listings = [];
-}
+} catch (Exception $e) { die("ERREUR SQL CRITIQUE : " . $e->getMessage()); }
 
 // Utilitaire pour reconstruire les URLs avec les filtres conservés
 function buildUrl($extraParams = []) {
@@ -313,17 +311,18 @@ require_once __DIR__ . '/app/views/layouts/header.php';
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     <?php foreach ($listings as $item): ?>
                         <?php 
-                            // Logique mathématique des promotions récupérée de l'ancien code
+                            // Logique mathématique des promotions
                             $hasDiscount = !empty($item['original_price']) && $item['original_price'] > $item['price'];
                             $discountPercent = 0;
                             if ($hasDiscount) {
                                 $discountPercent = round((($item['original_price'] - $item['price']) / $item['original_price']) * 100);
                             }
-                            $imageSrc = htmlspecialchars(!empty($item['image_url']) ? $item['image_url'] : 'assets/images/placeholder.jpg', ENT_QUOTES, 'UTF-8');
+                            // CORRECTION de l'image (image_path au lieu de image_url)
+                            $imageSrc = htmlspecialchars(!empty($item['image_path']) ? $item['image_path'] : 'assets/images/placeholder.jpg', ENT_QUOTES, 'UTF-8');
                         ?>
                         <div class="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group transform hover:-translate-y-1">
                             
-                            <!-- Image & Badges (Design UI avancé) -->
+                            <!-- Image & Badges -->
                             <div class="relative aspect-video bg-gray-100 overflow-hidden">
                                 <img src="<?= $imageSrc ?>" alt="<?= htmlspecialchars($item['title']) ?>" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
                                 
@@ -338,7 +337,7 @@ require_once __DIR__ . '/app/views/layouts/header.php';
                                 <?php endif; ?>
                             </div>
 
-                            <!-- Contenu (Titres, dates, etc.) -->
+                            <!-- Contenu (Titres, dates, DESCRIPTION) -->
                             <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
                                 <div>
                                     <div class="flex items-center text-[11px] font-bold text-gray-400 mb-2 uppercase tracking-wide">
@@ -351,6 +350,11 @@ require_once __DIR__ . '/app/views/layouts/header.php';
                                             <?= htmlspecialchars($item['title']) ?>
                                         </a>
                                     </h3>
+                                    
+                                    <!-- Extrait de la description -->
+                                    <p class="text-sm text-gray-500 mt-2 line-clamp-2">
+                                        <?= htmlspecialchars($item['description'] ?? '') ?>
+                                    </p>
                                 </div>
 
                                 <!-- Bloc Prix -->
@@ -419,6 +423,3 @@ require_once __DIR__ . '/app/views/layouts/header.php';
 // Chargement du Footer unifié
 require_once __DIR__ . '/app/views/layouts/footer.php'; 
 ?>
-
-
-

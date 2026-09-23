@@ -8,7 +8,7 @@ class HomeController {
         // Gestion de la configuration de l'URL
         $baseUrl = defined('APP_URL') ? APP_URL : (defined('APP_URL') ? APP_URL : '/man_go');
 
-        // Connexion sécurisée à la base de données (Votre méthode originale qui marche parfaitement)
+        // Connexion sécurisée à la base de données
         $dbInstance = Database::getInstance();
         $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
 
@@ -22,7 +22,7 @@ class HomeController {
         // Paramètres de recherche et de pagination
         $search_query = trim($_GET['q'] ?? '');
         $search_city  = trim($_GET['city'] ?? '');
-        $itemsPerPage = 6;
+        $itemsPerPage = 8; // Changé à 8 pour faire 2 belles lignes de 4 annonces sur PC
         $currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 
         // Récupération des catégories (élargies pour la vision internationale)
@@ -59,20 +59,21 @@ class HomeController {
         $totalPages = 1;
 
         try {
-            // CORRECTION CRUCIALE ICI : On cherche 'ACTIF' en MAJUSCULES, comme dans la base de données
-            $whereConditions = ["l.status = 'active'"];
+            // CORRECTION CRUCIALE : On cherche les annonces dont le statut est 'active', 'ACTIVE' ou 'PUBLISHED'
+            $whereConditions = ["LOWER(l.status) IN ('active', 'published')"];
             $params = [];
 
+            // Recherche textuelle globale
             if (!empty($search_query)) {
                 $whereConditions[] = "(l.title LIKE :q OR l.description LIKE :q)";
                 $params[':q'] = '%' . $search_query . '%';
             }
 
+            // Recherche par ville/location (uniquement si la colonne existe dans votre base)
             if (!empty($search_city)) {
-                // Modification ici : la table listings ne contient pas forcément de colonne 'city' ou 'location'
-                // Ajustez selon votre schéma, ou enlevez cette condition si elle n'existe pas
-                // $whereConditions[] = "(l.city LIKE :city OR l.location LIKE :city)";
-                // $params[':city'] = '%' . $search_city . '%';
+                // Pour éviter un crash PDO si la colonne n'existe pas, on cherche aussi dans la description
+                $whereConditions[] = "(l.description LIKE :city OR l.title LIKE :city)";
+                $params[':city'] = '%' . $search_city . '%';
             }
 
             $whereSql = " WHERE " . implode(" AND ", $whereConditions);
@@ -90,8 +91,8 @@ class HomeController {
 
             $offset = ($currentPage - 1) * $itemsPerPage;
 
-            // Requête des annonces limitées (On essaie de joindre les catégories si elles existent)
-            $sqlListings = "SELECT l.*, c.name AS category_name 
+            // Requête des annonces limitées (On joint les catégories)
+            $sqlListings = "SELECT l.*, c.name_key AS category_name 
                             FROM listings l 
                             LEFT JOIN categories c ON l.category_id = c.id 
                             " . $whereSql . " 
@@ -109,12 +110,13 @@ class HomeController {
             $listings = $stmtListings->fetchAll(PDO::FETCH_ASSOC);
 
         } catch (Exception $e) {
+            error_log("Erreur dans HomeController: " . $e->getMessage());
             $listings = [];
             $totalListings = 0;
             $totalPages = 1;
         }
 
-        // Helper de génération d'URL
+        // Helper de génération d'URL pour la pagination
         $buildUrl = function(array $newParams = []): string {
             $queryParams = $_GET;
             foreach ($newParams as $key => $value) {
@@ -150,4 +152,3 @@ class HomeController {
         }
     }
 }
-

@@ -23,12 +23,33 @@ $currency = $_SESSION['user_currency'] ?? 'FCFA';
 $userName = Session::get('user_name') ?? 'Vendeur';
 $userId = Session::get('user_id') ?? $current_user_id;
 
+$dbInstance = \App\Core\Database::getInstance();
+$db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
+
+// =====================================================================
+// ACTION : SUPPRESSION D'UNE ANNONCE DEPUIS LE TABLEAU DE BORD
+// =====================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_listing') {
+    $listingIdToDelete = filter_input(INPUT_POST, 'listing_id', FILTER_VALIDATE_INT);
+    if ($listingIdToDelete) {
+        // Vérification de sécurité : s'assurer que l'annonce appartient bien à l'utilisateur
+        $stmtCheck = $db->prepare("SELECT id FROM listings WHERE id = ? AND user_id = ?");
+        $stmtCheck->execute([$listingIdToDelete, $userId]);
+        if ($stmtCheck->fetch()) {
+            $stmtDel = $db->prepare("DELETE FROM listings WHERE id = ?");
+            $stmtDel->execute([$listingIdToDelete]);
+            // Redirection pour éviter la resoumission du formulaire
+            header('Location: dashboard.php?tab=tab-listings&msg=deleted');
+            exit;
+        }
+    }
+}
+
 // =====================================================================
 // Récupération des annonces du vendeur depuis la base de données
 // =====================================================================
 $myListings = [];
 try {
-    $db = \App\Core\Database::connect();
     $stmt = $db->prepare("SELECT * FROM listings WHERE user_id = :user_id ORDER BY created_at DESC");
     $stmt->execute([':user_id' => $userId]);
     $myListings = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -43,6 +64,9 @@ $categoryNames = [
     4 => 'Mode & Style',
     5 => 'Véhicules & Transports'
 ];
+
+// Vérifier si on doit ouvrir un onglet spécifique (ex: après une suppression)
+$activeTab = $_GET['tab'] ?? 'tab-stats';
 ?>
 
 <!DOCTYPE html>
@@ -98,6 +122,12 @@ $categoryNames = [
             <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/stands/create" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">
                 <i class="fa-solid fa-store w-6 text-center mr-2"></i> Ma Boutique / Stand
             </a>
+
+            <!-- NOUVEAU BOUTON : MA MESSAGERIE -->
+            <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/chat.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-2">
+                <i class="fa-solid fa-message w-6 text-center mr-2 text-indigo-400"></i> Ma Messagerie
+                <span class="ml-auto bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">Nouveau</span>
+            </a>
             
             <hr class="border-slate-200 my-4">
             
@@ -115,8 +145,14 @@ $categoryNames = [
         </nav>
 
         <div class="mt-4 pt-4 border-t border-slate-200">
-            <a href="../index.php" class="w-full flex items-center justify-center px-4 py-3 border-2 border-slate-900 text-slate-900 rounded-full font-bold hover:bg-slate-900 hover:text-white transition-all">
+            <!-- 1. Bouton Retour au site en premier -->
+            <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/" class="w-full flex items-center justify-center px-4 py-3 border-2 border-slate-900 text-slate-900 rounded-full font-bold hover:bg-slate-900 hover:text-white transition-all mb-3">
                 <i class="fa-solid fa-arrow-left mr-2"></i> Retour au site
+            </a>
+
+            <!-- 2. Bouton Déconnexion tout en bas -->
+            <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/logout.php" class="w-full flex items-center justify-center px-4 py-3 border-2 border-red-100 text-red-500 rounded-full font-bold hover:bg-red-50 transition-all">
+                <i class="fa-solid fa-arrow-right-from-bracket mr-2"></i> Déconnexion
             </a>
         </div>
     </aside>
@@ -153,15 +189,9 @@ $categoryNames = [
                 // =====================================================================
                 
                 try {
-                    $dbInstance = \App\Core\Database::getInstance();
-                    $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
-                    
-                    // On récupère l'ID de l'utilisateur connecté
-                    $currentUserId = class_exists('Session') ? \Session::getUserId() : ($_SESSION['user_id'] ?? 0);
-
                     // 1. Trouver le stand de cet utilisateur et vérifier s'il a payé le Premium
                     $stmtStand = $db->prepare("SELECT id, is_premium FROM stands WHERE user_id = ? LIMIT 1");
-                    $stmtStand->execute([$currentUserId]);
+                    $stmtStand->execute([$userId]);
                     $myStand = $stmtStand->fetch(PDO::FETCH_ASSOC);
 
                     $standId = $myStand ? $myStand['id'] : 0;
@@ -357,6 +387,12 @@ $categoryNames = [
                     </button>
                 </div>
                 
+                <?php if(isset($_GET['msg']) && $_GET['msg'] === 'deleted'): ?>
+                    <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-xl text-sm font-bold flex items-center">
+                        <i class="fa-solid fa-circle-check text-xl mr-3"></i> Annonce supprimée avec succès.
+                    </div>
+                <?php endif; ?>
+
                 <div class="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
                     <div class="overflow-x-auto">
                         <table class="w-full text-left text-sm whitespace-nowrap">
@@ -365,6 +401,7 @@ $categoryNames = [
                                     <th class="py-4 px-6">Produit / Service</th>
                                     <th class="py-4 px-6">Catégorie</th>
                                     <th class="py-4 px-6">Prix</th>
+                                    <th class="py-4 px-6 text-center">Vues</th>
                                     <th class="py-4 px-6">Statut</th>
                                     <th class="py-4 px-6 text-right">Actions</th>
                                 </tr>
@@ -373,7 +410,7 @@ $categoryNames = [
                                 
                                 <?php if (empty($myListings)): ?>
                                     <tr>
-                                        <td colspan="5" class="text-center py-16">
+                                        <td colspan="6" class="text-center py-16">
                                             <div class="bg-slate-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4">
                                                 <i class="fa-solid fa-box-open text-3xl text-slate-400"></i>
                                             </div>
@@ -384,6 +421,12 @@ $categoryNames = [
                                     </tr>
                                 <?php else: ?>
                                     <?php foreach ($myListings as $listing): ?>
+                                        <?php 
+                                            // Récupérer le nombre de vues spécifique à cette annonce
+                                            $stmtAdView = $db->prepare("SELECT COUNT(*) FROM ad_views WHERE listing_id = ?");
+                                            $stmtAdView->execute([$listing['id']]);
+                                            $adViewsCount = $stmtAdView->fetchColumn() ?: 0;
+                                        ?>
                                         <tr class="hover:bg-slate-50 transition">
                                             <td class="py-4 px-6 flex items-center">
                                                 <?php if (!empty($listing['image_path'])): ?>
@@ -391,7 +434,11 @@ $categoryNames = [
                                                 <?php else: ?>
                                                     <div class="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center mr-4 text-slate-400 shadow-sm"><i class="fa-solid fa-camera"></i></div>
                                                 <?php endif; ?>
-                                                <span class="font-bold text-slate-900 truncate max-w-[200px]"><?= htmlspecialchars($listing['title']) ?></span>
+                                                <span class="font-bold text-slate-900 truncate max-w-[200px]">
+                                                    <a href="../listing-detail.php?id=<?= $listing['id'] ?>" target="_blank" class="hover:text-amber-500 transition">
+                                                        <?= htmlspecialchars($listing['title']) ?>
+                                                    </a>
+                                                </span>
                                             </td>
                                             <td class="py-4 px-6 text-slate-500 font-medium">
                                                 <?= $categoryNames[$listing['category_id']] ?? 'Général' ?>
@@ -399,12 +446,34 @@ $categoryNames = [
                                             <td class="py-4 px-6 font-black text-amber-600">
                                                 <?= number_format($listing['price'], 0, ',', ' ') ?> <?= $currency ?>
                                             </td>
-                                            <td class="py-4 px-6">
-                                                <span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">Actif</span>
+                                            <td class="py-4 px-6 text-center">
+                                                <span class="bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md text-xs font-bold">
+                                                    <i class="fa-solid fa-eye mr-1"></i> <?= $adViewsCount ?>
+                                                </span>
                                             </td>
-                                            <td class="py-4 px-6 text-right">
-                                                <button class="text-slate-400 hover:text-blue-500 p-2 transition" title="Modifier"><i class="fa-solid fa-pen"></i></button>
-                                                <button class="text-slate-400 hover:text-red-500 p-2 transition" title="Supprimer"><i class="fa-solid fa-trash"></i></button>
+                                            <td class="py-4 px-6">
+                                                <?php if($listing['status'] === 'active'): ?>
+                                                    <span class="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide">Actif</span>
+                                                <?php elseif($listing['status'] === 'scheduled'): ?>
+                                                    <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide" title="<?= date('d/m/Y H:i', strtotime($listing['scheduled_at'])) ?>"><i class="fa-regular fa-clock"></i> Programmé</span>
+                                                <?php else: ?>
+                                                    <span class="bg-slate-200 text-slate-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide"><?= htmlspecialchars($listing['status']) ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td class="py-4 px-6 text-right flex justify-end space-x-2">
+                                                <!-- Bouton Modifier (Lien vers publish.php) -->
+                                                <a href="../publish.php?id=<?= $listing['id'] ?>" class="text-slate-400 hover:text-blue-500 p-2 transition" title="Modifier">
+                                                    <i class="fa-solid fa-pen"></i>
+                                                </a>
+                                                
+                                                <!-- Formulaire de Suppression -->
+                                                <form method="POST" onsubmit="return confirm('Êtes-vous sûr de vouloir supprimer cette annonce ?');" class="inline">
+                                                    <input type="hidden" name="action" value="delete_listing">
+                                                    <input type="hidden" name="listing_id" value="<?= $listing['id'] ?>">
+                                                    <button type="submit" class="text-slate-400 hover:text-red-500 p-2 transition" title="Supprimer">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                    </button>
+                                                </form>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -517,12 +586,15 @@ $categoryNames = [
     <!-- TOUT LE JAVASCRIPT COMPLET -->
     <script>
         const CURRENCY = <?=json_encode($currency)?>;
+        const INITIAL_TAB = <?= json_encode($activeTab) ?>;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadVendorStats();
             loadBusinessSettings();
             loadQuickReplies();
             setupToggleSwitches();
+            // Ouvrir le bon onglet (ex: après une suppression, on reste sur l'onglet Annonces)
+            switchTab(INITIAL_TAB);
         });
 
         // Menu Mobile
@@ -547,9 +619,12 @@ $categoryNames = [
             document.querySelectorAll('.nav-link').forEach(el => {
                 el.className = 'nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all';
             });
-            document.getElementById(tabId).classList.remove('hidden');
+            
+            const targetPane = document.getElementById(tabId);
+            if(targetPane) targetPane.classList.remove('hidden');
+            
             const activeBtn = document.getElementById(tabId + '-btn');
-            activeBtn.className = 'nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold transition-all bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md';
+            if(activeBtn) activeBtn.className = 'nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold transition-all bg-gradient-to-r from-amber-500 to-amber-600 text-white shadow-md';
             
             if(window.innerWidth < 1024) toggleSidebar(); 
         }
@@ -600,6 +675,7 @@ $categoryNames = [
                 const res = await fetch('../api/vendor.php?action=getStats');
                 const data = await res.json();
                 const container = document.getElementById('statsContainer');
+                if(!container) return; // Sécurité si l'élément n'existe pas
                 
                 container.innerHTML = `
                     <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm flex items-center gap-4 hover:shadow-md transition">
@@ -633,7 +709,8 @@ $categoryNames = [
                 `;
             } catch (e) {
                 console.error("Erreur Stats:", e);
-                document.getElementById('statsContainer').innerHTML = `<p class="col-span-full text-red-500">Erreur lors du chargement des statistiques.</p>`;
+                const container = document.getElementById('statsContainer');
+                if(container) container.innerHTML = `<p class="col-span-full text-red-500">Erreur lors du chargement des statistiques.</p>`;
             }
         }
 
@@ -681,6 +758,7 @@ $categoryNames = [
                 const res = await fetch('../api/chat.php?action=getQuickReplies');
                 const replies = await res.json();
                 const tbody = document.getElementById('quickRepliesTable');
+                if(!tbody) return;
                 
                 if (!replies || replies.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-slate-500">Aucun raccourci enregistré.</td></tr>';
