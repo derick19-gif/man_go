@@ -83,13 +83,23 @@ class ChatController extends Controller {
     }
 
     private function filterMessage($text) {
-        $text = preg_replace('/(\+?\d{1,4}[ -]?)?\(?\d{2,3}\)?[ -]?\d{3}[ -]?\d{4}/', '[NUMÉRO MASQUÉ]', $text);
-        $text = preg_replace('/(https?:\/\/[^\s]+)/', '[LIEN EXTERNE BLOQUÉ]', $text);
+        // 1. On vérifie si c'est notre propre message de géolocalisation
+        $isLocation = (strpos($text, '📍 Ma position : https://www.google.com/maps') !== false);
 
-        $badWords = ['con', 'connard', 'salope', 'merde', 'putain', 'drogue', 'cocaïne', 'arme', 'tueur', 'héroïne', 'nègre', 'bougnoule'];
+        // 2. On applique les filtres stricts SEULEMENT si ce n'est pas une géolocalisation
+        if (!$isLocation) {
+            // Masque les numéros de téléphone
+            $text = preg_replace('/(\+?\d{1,4}[ -]?)?\(?\d{2,3}\)?[ -]?\d{3}[ -]?\d{4}/', '[NUMÉRO MASQUÉ]', $text);
+            // Masque les liens externes
+            $text = preg_replace('/(https?:\/\/[^\s]+)/', '[LIEN EXTERNE BLOQUÉ]', $text);
+        }
+
+        // 3. Masque les mots interdits (Toujours)
+        $badWords = ['con', 'connard', 'salope', 'merde', 'putain'];
         foreach ($badWords as $word) {
             $text = str_ireplace($word, str_repeat('*', strlen($word)), $text);
         }
+        
         return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
     }
 

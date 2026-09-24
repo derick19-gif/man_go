@@ -3,22 +3,29 @@
 // PAGE DÉTAIL D'UNE ANNONCE - listing-detail.php
 // =========================================================================
 
+// 1. On charge la configuration EN PREMIER (Crucial pour le nom de la session)
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/core/Autoloader.php';
 require_once __DIR__ . '/core/Database.php';
 
-// Initialisation propre de la session
+// 2. Démarrage de la session AVEC LE BON NOM
+if (defined('SESSION_NAME')) {
+    session_name(SESSION_NAME);
+}
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-if (class_exists('Session') && method_exists('Session', 'init')) {
-    Session::init();
-}
 
 $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
-$currentUserId = $_SESSION['user_id'] ?? (class_exists('Session') ? Session::get('user_id') : null);
-$isAdmin = ($_SESSION['user_role'] ?? '') === 'admin';
 
+// =========================================================================
+// CORRECTION : Définition des variables
+// =========================================================================
+$currentUserId = $_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? null);
+$currentUserRole = $_SESSION['user_role'] ?? ($_SESSION['user']['role'] ?? '');
+$isAdmin = in_array($currentUserRole, ['admin', 'super_admin', '1', '2']);
+
+// Récupération de l'ID
 $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
 if (!$id || $id <= 0) {
     header("Location: $baseUrl/listings.php");
@@ -123,9 +130,8 @@ $currentListingUrl = urlencode("http://localhost$baseUrl/listing-detail.php?id="
 
 $pageTitle = $listing['title'] . " - MAN GO";
 
-// ON FORCE LE BON HEADER EN LUI PASSANT LES BONNES VARIABLES
-$_SESSION['user_id'] = $currentUserId; 
-$_SESSION['user_role'] = $_SESSION['user_role'] ?? ($isAdmin ? 'admin' : ($isOwner ? 'vendor' : 'buyer'));
+// 3. INCLUSION DU HEADER
+// IMPORTANT : On inclut le bon header sans écraser la variable $_SESSION !
 require_once __DIR__ . '/themes/default/templates/layouts/header.php';
 ?>
 

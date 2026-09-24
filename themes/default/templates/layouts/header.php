@@ -1,41 +1,30 @@
 <?php
 // themes/default/templates/layouts/header.php
+
+// 1. On s'assure que la session est lue
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+
 $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
 
-// 1. GESTION ULTRA-ROBUSTE DE LA SESSION
+// 2. LECTURE FIABLE DE LA SESSION
 $isLoggedIn = false;
-$userName = 'Utilisateur';
 $userRole = '';
 
-// On vérifie d'abord si la classe Session de l'App existe
-if (class_exists('App\Core\Session') && \App\Core\Session::isAuthenticated()) {
+if (!empty($_SESSION['user_id'])) {
     $isLoggedIn = true;
-    $userName = \App\Core\Session::get('user_name') ?: 'Utilisateur';
-    $userRole = \App\Core\Session::get('user_role') ?: '';
-} 
-// Fallback 1: Si une classe Session simple existe
-elseif (class_exists('Session') && Session::get('user_id')) {
+    $userRole = $_SESSION['user_role'] ?? '';
+} elseif (!empty($_SESSION['user']['id'])) {
     $isLoggedIn = true;
-    $userName = Session::get('user_name') ?: 'Utilisateur';
-    $userRole = Session::get('user_role') ?: '';
-}
-// Fallback 2: Lecture directe du tableau $_SESSION natif
-elseif (isset($_SESSION['user_id']) || isset($_SESSION['user'])) {
-    $isLoggedIn = true;
-    $userName = $_SESSION['user_name'] ?? $_SESSION['user']['name'] ?? 'Utilisateur';
-    $userRole = $_SESSION['user_role'] ?? $_SESSION['user']['role'] ?? '';
+    $userRole = $_SESSION['user']['role'] ?? '';
 }
 
-// 2. Variables de contrôle global pour l'affichage
-// Ces variables seront lues par le Header ET par le Footer !
-$isVendor = ($userRole === 'vendor' || $userRole === 'vendeur' || $userRole === '4');
-$isAdmin = ($userRole === 'admin' || $userRole === 'super_admin' || $userRole === '1' || $userRole === '2');
-$isBuyer = ($userRole === 'buyer' || $userRole === 'client' || $userRole === '5');
+// 3. LOGIQUE DES RÔLES
+$isVendor = in_array($userRole, ['vendor', 'vendeur', '4']);
+$isAdmin = in_array($userRole, ['admin', 'super_admin', '1', '2']);
 
-// Routage dynamique du bouton d'espace perso
+// 4. ROUTAGE DYNAMIQUE DES BOUTONS
 if ($isVendor) {
     $dashboardLink = $baseUrl . '/vendor_dir/dashboard.php';
     $btnLabel = 'Espace Pro';
@@ -45,16 +34,20 @@ if ($isVendor) {
     $btnLabel = 'Administration';
     $btnIcon = 'fa-hammer';
 } else {
+    // C'est un client simple
     $dashboardLink = $baseUrl . '/client/views/dashboard.php';
-    $btnLabel = 'Mon Compte';
+    $btnLabel = 'Mon Tableau de bord';
     $btnIcon = 'fa-user';
 }
 
-// On cache le bouton "Publier" pour les acheteurs et les admins
-$showPublishButton = (!$isLoggedIn || $isVendor);
+// 5. RÈGLE DU BOUTON PUBLIER
+// Visible SEULEMENT pour les visiteurs (non connectés) OU les vendeurs/admins.
+// Il sera CACHÉ pour les clients simples.
+$showPublishButton = (!$isLoggedIn || $isVendor || $isAdmin);
 
-// On en profite pour envoyer une info au FOOTER : Faut-il cacher "Devenir Vendeur" ?
-define('HIDE_BECOME_VENDOR', ($isVendor || $isAdmin));
+if (!defined('HIDE_BECOME_VENDOR')) {
+    define('HIDE_BECOME_VENDOR', ($isVendor || $isAdmin));
+}
 ?>
 <!DOCTYPE html>
 <html lang="fr" class="h-full">
@@ -108,18 +101,22 @@ define('HIDE_BECOME_VENDOR', ($isVendor || $isAdmin));
 
         <div class="hidden md:flex items-center space-x-4">
             <?php if ($isLoggedIn): ?>
+                <!-- SEUL BOUTON POUR LES UTILISATEURS CONNECTÉS -->
                 <a href="<?= $dashboardLink ?>" class="text-sm font-bold text-slate-200 hover:text-amber-400 transition flex items-center space-x-2 bg-slate-800/50 px-4 py-2 rounded-full border border-slate-700/50">
                     <i class="fa-solid <?= $btnIcon ?> text-amber-500"></i>
                     <span><?= $btnLabel ?></span>
                 </a>
+                <!-- BOUTON DÉCONNEXION -->
                 <a href="<?= $baseUrl ?>/logout.php" class="text-xs font-bold text-red-400 hover:text-red-300 p-2.5 rounded-full hover:bg-red-500/10 transition" title="Déconnexion">
                     <i class="fa-solid fa-power-off text-sm"></i>
                 </a>
             <?php else: ?>
+                <!-- BOUTONS POUR LES VISITEURS PUBLICS -->
                 <a href="<?= $baseUrl ?>/login.php" class="text-sm font-bold text-slate-300 hover:text-amber-400 px-3 py-2 transition">Connexion</a>
                 <a href="<?= $baseUrl ?>/register.php" class="text-sm font-bold text-amber-400 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-5 py-2.5 rounded-full transition shadow-sm">Inscription</a>
             <?php endif; ?>
 
+            <!-- BOUTON PUBLIER (Affiché selon la règle 5) -->
             <?php if($showPublishButton): ?>
                 <a href="<?= $baseUrl ?>/publish.php" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold px-5 py-2.5 rounded-full text-sm transition-all duration-300 shadow-futuristic flex items-center space-x-2 transform hover:-translate-y-0.5">
                     <i class="fa-solid fa-plus-circle"></i><span>Publier</span>
@@ -127,11 +124,12 @@ define('HIDE_BECOME_VENDOR', ($isVendor || $isAdmin));
             <?php endif; ?>
         </div>
         
-        <!-- Menu Mobile Toggle (à garder si vous en avez besoin) -->
         <div class="flex md:hidden items-center space-x-3">
-            <a href="<?= $isLoggedIn ? $dashboardLink . '#tab-publish' : $baseUrl . '/login.php' ?>" class="bg-amber-500 text-slate-950 font-bold p-2.5 rounded-full text-xs shadow-md">
-                <i class="fa-solid fa-plus"></i>
-            </a>
+            <?php if($showPublishButton): ?>
+                <a href="<?= $isLoggedIn ? $dashboardLink . '#tab-publish' : $baseUrl . '/login.php' ?>" class="bg-amber-500 text-slate-950 font-bold p-2.5 rounded-full text-xs shadow-md">
+                    <i class="fa-solid fa-plus"></i>
+                </a>
+            <?php endif; ?>
             <button id="mobile-menu-button" type="button" class="text-slate-300 hover:text-white focus:outline-none p-2 rounded-lg bg-slate-900 border border-slate-800">
                 <i class="fa-solid fa-bars text-lg"></i>
             </button>

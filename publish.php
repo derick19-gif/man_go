@@ -6,15 +6,28 @@
 if (!defined('APP_PATH')) {
     define('APP_PATH', __DIR__);
 }
+
+// NE SURTOUT PAS SUPPRIMER CETTE LIGNE :
 require_once __DIR__ . '/config/config.php';
 
 if (defined('SESSION_NAME')) session_name(SESSION_NAME);
-if (session_status() === PHP_SESSION_NONE) session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
 
+// 1. Sécurité : Si l'utilisateur n'est PAS connecté du tout
 if (empty($_SESSION['user_id'])) {
     header("Location: $baseUrl/login.php?redirect=publish.php");
+    exit();
+}
+
+// 2. Sécurité : Si l'utilisateur est connecté mais n'est PAS un vendeur
+$userRole = $_SESSION['user_role'] ?? '';
+if (!in_array($userRole, ['vendor', 'vendeur', '4'])) { // J'ajoute '4' au cas où vous utiliseriez des ID pour les rôles
+    // Redirige vers le tableau de bord client avec un message d'erreur
+    header("Location: $baseUrl/client/views/dashboard.php?error=not_vendor");
     exit();
 }
 
