@@ -96,3 +96,9 @@ if (!function_exists('__t')) {
         return $text;
     }
 }
+
+// =========================================================================
+// PARAMÈTRES DU PROGRAMME D'AFFILIATION
+// =========================================================================
+// Pourcentage de commission (Mettez 0 pour désactiver temporairement le programme)
+define('REFERRAL_COMMISSION_PERCENT', 20);

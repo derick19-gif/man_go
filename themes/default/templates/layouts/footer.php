@@ -33,7 +33,7 @@ $hideBecomeVendor = defined('HIDE_BECOME_VENDOR') ? HIDE_BECOME_VENDOR : false;
         <div>
             <h4 style="color: #fff; font-size: 16px; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 0.5px;">Programmes</h4>
             <ul style="list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; font-size: 14px;">
-                <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/referral" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Programme de Parrainage</a></li>
+                <li><a href="<?= defined('APP_URL') ? APP_URL : '/man_go'; ?>/referral.php" style="color: #94a3b8; text-decoration: none; transition: color 0.2s;">Programme de Parrainage</a></li>
                 
                 <!-- AFFICHÉ UNIQUEMENT SI L'UTILISATEUR EST VENDEUR -->
                 <?php if ($hideBecomeVendor): ?>

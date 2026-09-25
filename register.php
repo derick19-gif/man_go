@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/core/Autoloader.php';
+require_once __DIR__ . '/core/Database.php';
 
 Session::init();
 
@@ -30,13 +31,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dial_code  = trim($_POST['dial_code'] ?? '+228');
     $raw_phone  = trim($_POST['phone'] ?? '');
     $terms      = isset($_POST['terms']) ? true : false;
+    
+    // Récupération du code de parrainage caché
+    $referral_code_post = trim($_POST['referral_code'] ?? '');
 
     // Validation du rôle autorisé
     if (!in_array($role, ['buyer', 'vendor'])) {
         $role = 'buyer';
     }
 
-    $phone = Countries::formatPhone($dial_code, $raw_phone);
+    // Formatage du téléphone (On suppose que Countries::formatPhone existe dans votre architecture)
+    $phone = class_exists('Countries') && method_exists('Countries', 'formatPhone') 
+             ? Countries::formatPhone($dial_code, $raw_phone) 
+             : $dial_code . preg_replace('/[^0-9]/', '', $raw_phone);
 
     if (!$full_name || !$email || !$password || empty($raw_phone)) {
         $error = "Veuillez remplir tous les champs obligatoires.";
@@ -47,27 +54,44 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (!$terms) {
         $error = "Vous devez accepter les conditions d'utilisation.";
     } else {
-        $db = getDBConnection();
+        $db = \App\Core\Database::connect();
 
         try {
+            // Vérification si l'utilisateur existe déjà
             $stmt = $db->prepare("SELECT id FROM users WHERE email = :email OR phone = :phone LIMIT 1");
             $stmt->execute([':email' => $email, ':phone' => $phone]);
 
             if ($stmt->fetch()) {
                 $error = "Un compte existe déjà avec cet e-mail ou ce numéro de téléphone.";
             } else {
+                
+                // --- LOGIQUE DE PARRAINAGE ---
+                $referred_by_id = null; // Par défaut, aucun parrain
+                
+                if (!empty($referral_code_post)) {
+                    $stmtParrain = $db->prepare("SELECT id FROM users WHERE referral_code = :ref LIMIT 1");
+                    $stmtParrain->execute([':ref' => $referral_code_post]);
+                    $parrain = $stmtParrain->fetch(PDO::FETCH_ASSOC);
+                    
+                    if ($parrain) {
+                        $referred_by_id = $parrain['id']; // Le parrain est identifié
+                    }
+                }
+                // -----------------------------
+
                 $password_hash = password_hash($password, PASSWORD_DEFAULT);
 
                 $name_parts = explode(' ', $full_name, 2);                
                 $firstname = $name_parts[0] ?? $full_name;                
                 $lastname = $name_parts[1] ?? '';
 
-                // Définition de l'ID du rôle (par exemple 2 pour acheteur/vendeur ou selon votre table roles)
-                $roleId = ($role === 'vendor') ? 4 : 5; // Ajustez les IDs selon votre base roles
+                // Définition de l'ID du rôle
+                $roleId = ($role === 'vendor') ? 4 : 5; 
 
+                // Insertion avec la colonne referred_by
                 $stmtInsert = $db->prepare("
-                    INSERT INTO users (firstname, lastname, email, phone, password_hash, role_id, created_at)
-                    VALUES (:firstname, :lastname, :email, :phone, :password_hash, :role_id, NOW())
+                    INSERT INTO users (firstname, lastname, email, phone, password_hash, role_id, referred_by, created_at)
+                    VALUES (:firstname, :lastname, :email, :phone, :password_hash, :role_id, :referred_by, NOW())
                 ");
 
                 $stmtInsert->execute([
@@ -76,12 +100,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ':email'         => $email,
                     ':phone'         => $phone,
                     ':password_hash' => $password_hash,
-                    ':role_id'       => $roleId
+                    ':role_id'       => $roleId,
+                    ':referred_by'   => $referred_by_id
                 ]);
 
-                // Inscription réussie ! 
-                // On redirige vers la page de connexion pour afficher le message de succès
-                // L'utilisateur devra se connecter manuellement (meilleure pratique de sécurité)
+                // Redirection après succès
                 header('Location: login.php?registered=1');
                 exit;
             }
@@ -122,14 +145,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p class="text-xs text-gray-500 mt-1">Rejoignez la communauté internationale MAN GO</p>
             </div>
 
-            <div>
-                <label class="block text-xs font-bold text-gray-700 mb-1">Type de compte</label>
-                <select name="role" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500">
-                    <option value="buyer">Acheteur</option>
-                    <option value="vendor">Vendeur / Propriétaire de stand</option>
-                </select>
-            </div>
-
             <?php if (!empty($error)): ?>
                 <div class="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-lg flex items-center space-x-2">
                     <i class="fa-solid fa-circle-exclamation text-base"></i>
@@ -139,6 +154,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <form action="register.php" method="POST" class="space-y-4">
                 
+                <!-- CHAMP CACHÉ POUR CAPTURER LE CODE PARRAIN -->
+                <input type="hidden" name="referral_code" value="<?= htmlspecialchars($_GET['ref'] ?? '') ?>">
+
+                <div>
+                    <label class="block text-xs font-bold text-gray-700 mb-1">Type de compte</label>
+                    <select name="role" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-amber-500 transition">
+                        <option value="buyer">Acheteur</option>
+                        <option value="vendor">Vendeur / Propriétaire de stand</option>
+                    </select>
+                </div>
+
                 <!-- Nom complet -->
                 <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1">Nom complet</label>
@@ -165,12 +191,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1">Numéro de téléphone (WhatsApp)</label>
                     <div class="flex gap-2">
-                        <select name="dial_code" class="w-2/5 bg-gray-50 border border-gray-300 rounded-xl px-2 py-2.5 text-xs focus:outline-none focus:border-amber-500">
-                            <?= Countries::renderSelectOptions($_POST['dial_code'] ?? '+228') ?>
+                        <select name="dial_code" class="w-2/5 bg-gray-50 border border-gray-300 rounded-xl px-2 py-2.5 text-xs focus:outline-none focus:border-amber-500 transition">
+                            <?= class_exists('Countries') && method_exists('Countries', 'renderSelectOptions') 
+                                ? Countries::renderSelectOptions($_POST['dial_code'] ?? '+228') 
+                                : '<option value="+228">+228 (Togo)</option><option value="+229">+229 (Bénin)</option><option value="+225">+225 (CI)</option>' ?>
                         </select>
                         <input type="tel" name="phone" required value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>" 
                                placeholder="90123456" 
-                               class="w-3/5 px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-amber-500">
+                               class="w-3/5 px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-amber-500 transition">
                     </div>
                 </div>
 
@@ -180,8 +208,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fa-solid fa-lock"></i></span>
                         <input type="password" name="password" id="password" required placeholder="Min. 8 car. (Maj, Min, Chiffre, Symbole)" 
-                               class="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-amber-500">
-                        <button type="button" onclick="togglePassword('password', 'eye1')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                               class="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-amber-500 transition">
+                        <button type="button" onclick="togglePassword('password', 'eye1')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-amber-500 transition">
                             <i id="eye1" class="fa-solid fa-eye"></i>
                         </button>
                     </div>
@@ -193,8 +221,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400"><i class="fa-solid fa-lock"></i></span>
                         <input type="password" name="confirm_password" id="confirm_password" required placeholder="Répétez le mot de passe" 
-                               class="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-amber-500">
-                        <button type="button" onclick="togglePassword('confirm_password', 'eye2')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                               class="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm focus:outline-none focus:border-amber-500 transition">
+                        <button type="button" onclick="togglePassword('confirm_password', 'eye2')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-amber-500 transition">
                             <i id="eye2" class="fa-solid fa-eye"></i>
                         </button>
                     </div>
@@ -202,13 +230,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <!-- Conditions d'utilisation -->
                 <div class="flex items-start space-x-2 pt-2">
-                    <input type="checkbox" name="terms" id="terms" required class="mt-1 rounded border-gray-300 text-amber-500 focus:ring-amber-500">
-                    <label for="terms" class="text-xs text-gray-600">
-                        J'accepte les <a href="#" class="text-amber-600 underline">Conditions d'utilisation</a> et la <a href="#" class="text-amber-600 underline">Règle de confidentialité</a>.
+                    <input type="checkbox" name="terms" id="terms" required class="mt-1 rounded border-gray-300 text-amber-500 focus:ring-amber-500 cursor-pointer">
+                    <label for="terms" class="text-xs text-gray-600 cursor-pointer">
+                        J'accepte les <a href="terms.php" class="text-amber-600 hover:text-amber-700 underline font-semibold">Conditions d'utilisation</a> et la <a href="privacy.php" class="text-amber-600 hover:text-amber-700 underline font-semibold">Politique de confidentialité</a>.
                     </label>
                 </div>
 
-                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3 rounded-xl shadow transition text-sm flex items-center justify-center space-x-2 mt-4">
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-slate-950 font-extrabold py-3 rounded-xl shadow-lg transition-all transform hover:-translate-y-0.5 text-sm flex items-center justify-center space-x-2 mt-4">
                     <span>Créer mon compte</span>
                     <i class="fa-solid fa-arrow-right"></i>
                 </button>

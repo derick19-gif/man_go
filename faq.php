@@ -3,10 +3,23 @@
 // Page FAQ - MAN GO Marketplace (Version MVC)
 // =========================================================================
 
+// 1. On charge la configuration EN PREMIER (Crucial pour le nom de la session)
+require_once __DIR__ . '/config/config.php';
+
+// 2. Démarrage de la session AVEC LE BON NOM
+if (defined('SESSION_NAME')) {
+    session_name(SESSION_NAME);
+}
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
+
 // Définition du titre de la page pour le header
 $pageTitle = 'Foire aux Questions (FAQ) - MAN GO';
 
-// 1. Inclusion dynamique du Header (En-tête global)
+// 3. Inclusion dynamique du Header (En-tête global)
 $headerPath = __DIR__ . '/themes/default/templates/layouts/header.php';
 if (!file_exists($headerPath)) {
     $headerPath = __DIR__ . '/app/views/layouts/header.php';
