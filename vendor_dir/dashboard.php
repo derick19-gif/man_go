@@ -27,6 +27,43 @@ $dbInstance = \App\Core\Database::getInstance();
 $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
 
 // =====================================================================
+// VÉRIFICATION RÉELLE DE L'ABONNEMENT DANS LA BASE DE DONNÉES
+// =====================================================================
+$stmtSub = $db->prepare("
+    SELECT s.end_date, p.name as plan_name, p.id as plan_id
+    FROM user_subscriptions s
+    JOIN subscription_plans p ON s.plan_id = p.id
+    WHERE s.user_id = ? AND s.status = 'active' AND s.end_date > NOW()
+    ORDER BY s.id DESC LIMIT 1
+");
+$stmtSub->execute([$_SESSION['user_id']]);
+$activeSub = $stmtSub->fetch(PDO::FETCH_ASSOC);
+
+$isPremium = false;
+$currentPlanName = '';
+$daysRemaining = 0;
+
+// Variables de style (couleur bleue pour Starter, Or pour VIP)
+$planBadgeColor = 'bg-amber-100 text-amber-700 border-amber-200'; 
+$planIconColor = 'text-amber-500';
+
+if ($activeSub) {
+    $isPremium = true;
+    $currentPlanName = $activeSub['plan_name'];
+    
+    // Calcul des jours restants réels
+    $endDate = new DateTime($activeSub['end_date']);
+    $now = new DateTime();
+    $daysRemaining = $now->diff($endDate)->days;
+    
+    // Si c'est le forfait Starter (ID 3), on met du bleu
+    if ($activeSub['plan_id'] == 3) { 
+        $planBadgeColor = 'bg-blue-100 text-blue-700 border-blue-200';
+        $planIconColor = 'text-blue-500';
+    }
+}
+
+// =====================================================================
 // ACTION : SUPPRESSION D'UNE ANNONCE DEPUIS LE TABLEAU DE BORD
 // =====================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete_listing') {
@@ -88,6 +125,13 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
             }
         }
     </script>
+    <style>
+        /* Design de la barre de défilement du menu (Chrome/Edge/Safari) */
+        #sidebar nav::-webkit-scrollbar { width: 4px; }
+        #sidebar nav::-webkit-scrollbar-track { background: transparent; }
+        #sidebar nav::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
+        #sidebar nav::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
+    </style>
 </head>
 <body class="bg-slate-50 font-sans text-slate-800 flex h-screen overflow-hidden relative">
 
@@ -118,12 +162,12 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
                 <i class="fa-solid fa-plus-circle w-6 text-center mr-2"></i> Publier
             </button>
 
-            <!-- NOUVEAU BOUTON : MA BOUTIQUE -->
+            <!-- BOUTON : MA BOUTIQUE -->
             <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/stands/create" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">
                 <i class="fa-solid fa-store w-6 text-center mr-2"></i> Ma Boutique / Stand
             </a>
 
-            <!-- NOUVEAU BOUTON : MA MESSAGERIE -->
+            <!-- BOUTON : MA MESSAGERIE -->
             <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/chat.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-2">
                 <i class="fa-solid fa-message w-6 text-center mr-2 text-indigo-400"></i> Ma Messagerie
                 <span class="ml-auto bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">Nouveau</span>
@@ -138,8 +182,8 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
                 <i class="fa-solid fa-bolt w-6 text-center mr-2"></i> Raccourcis
             </button>
 
-            <!-- NOUVEAU BOUTON : PARAMÈTRES (Verrouillage profil, infos, etc.) -->
-            <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/settings" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-auto">
+            <!-- BOUTON : PARAMÈTRES -->
+            <a href="<?= defined('APP_URL') ? APP_URL : '/man_go' ?>/settings.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-auto">
                 <i class="fa-solid fa-user-gear w-6 text-center mr-2"></i> Paramètres
             </a>
         </nav>
@@ -189,13 +233,12 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
                 // =====================================================================
                 
                 try {
-                    // 1. Trouver le stand de cet utilisateur et vérifier s'il a payé le Premium
-                    $stmtStand = $db->prepare("SELECT id, is_premium FROM stands WHERE user_id = ? LIMIT 1");
+                    // 1. Trouver le stand de cet utilisateur
+                    $stmtStand = $db->prepare("SELECT id FROM stands WHERE user_id = ? LIMIT 1");
                     $stmtStand->execute([$userId]);
                     $myStand = $stmtStand->fetch(PDO::FETCH_ASSOC);
 
                     $standId = $myStand ? $myStand['id'] : 0;
-                    $isPremium = $myStand ? (bool)$myStand['is_premium'] : false;
 
                     // 2. Vraies Vues Totales
                     $stmtViews = $db->prepare("SELECT COUNT(*) FROM ad_views WHERE stand_id = ?");
@@ -205,7 +248,7 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
                     // Simulation d'une croissance à 0% pour le moment
                     $stats_views_growth = 0;  
                     
-                    // 3. Vrais Clics (Si vous n'avez pas encore de table pour les clics, on met à 0)
+                    // 3. Vrais Clics
                     $stats_clicks = 0;
                     $stats_clicks_growth = 0;  
                     
@@ -250,7 +293,6 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
 
                 } catch (Exception $e) {
                     // Sécurité anti-crash au cas où la base de données met du temps à se mettre à jour
-                    $isPremium = false;
                     $stats_views = $stats_clicks = $stats_rate = $stats_followers = 0;
                     $stats_views_growth = $stats_clicks_growth = 0;
                     $stats_locations = [['name' => 'Données indisponibles', 'percent' => 0, 'color' => 'bg-slate-200']];
@@ -264,12 +306,12 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
                     </div>
                     
                     <?php if (!$isPremium): ?>
-                        <a href="upgrade.php" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg transition-all hover:-translate-y-0.5">
+                        <a href="/man_go/pricing.php" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg transition-all hover:-translate-y-0.5">
                             <i class="fa-solid fa-crown text-amber-500"></i> Passer en Premium
                         </a>
                     <?php else: ?>
-                        <span class="inline-flex items-center gap-2 bg-amber-100 text-amber-700 px-4 py-2.5 rounded-xl font-black text-sm border border-amber-200">
-                            <i class="fa-solid fa-crown"></i> Compte PRO Actif
+                        <span class="inline-flex items-center gap-2 <?= $planBadgeColor ?> px-4 py-2.5 rounded-xl font-black text-sm border shadow-sm cursor-default">
+                            <i class="fa-solid fa-crown"></i> Abonné : <?= htmlspecialchars($currentPlanName) ?>
                         </span>
                     <?php endif; ?>
                 </div>
@@ -329,17 +371,44 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
                 <!-- ================================================== -->
                 <h2 class="text-lg font-black text-slate-900 mb-4">Analyses Avancées & Audience</h2>
                 
+                <?php if ($isPremium): ?>
+                    <!-- L'encart DÉVERROUILLÉ (Affiche le temps restant au-dessus des stats) -->
+                    <div class="p-6 sm:p-8 bg-slate-900 rounded-3xl border <?= ($activeSub['plan_id'] == 3) ? 'border-blue-500/30' : 'border-amber-500/30' ?> relative overflow-hidden mb-6 shadow-xl">
+                        <div class="absolute -right-6 -top-6 text-[8rem] opacity-5 <?= $planIconColor ?>">
+                            <i class="fa-solid fa-crown"></i>
+                        </div>
+                        
+                        <div class="relative z-10">
+                            <h3 class="text-xl font-black text-white mb-2 flex items-center">
+                                <i class="fa-solid fa-circle-check text-emerald-400 mr-3"></i> Outils Pro Déverrouillés
+                            </h3>
+                            <p class="text-slate-300 text-sm mb-6">
+                                Vous profitez actuellement des avantages du forfait <strong><?= htmlspecialchars($currentPlanName) ?></strong>. Vos annonces bénéficient d'une priorité dans les résultats de recherche.
+                            </p>
+                            
+                            <div class="flex items-center space-x-4">
+                                <div class="bg-slate-950/60 inline-block px-5 py-3 rounded-xl border border-slate-800">
+                                    <span class="text-[10px] text-slate-400 block uppercase tracking-widest mb-1 font-bold">Temps restant</span>
+                                    <span class="text-xl font-black <?= $planIconColor ?>"><?= $daysRemaining ?> Jours</span>
+                                </div>
+                                <a href="/man_go/pricing.php" class="text-xs text-slate-400 hover:text-white underline font-bold transition">Renouveler l'abonnement</a>
+                            </div>
+                        </div>
+                    </div>
+                <?php endif; ?>
+
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
                     
                     <?php if (!$isPremium): ?>
+                        <!-- L'encart verrouillé quand on n'est PAS premium (Affiche le cadenas par-dessus) -->
                         <div class="absolute inset-0 z-10 bg-slate-50/60 backdrop-blur-sm rounded-3xl flex flex-col items-center justify-center border border-white/50">
-                            <div class="bg-slate-900 p-8 rounded-3xl shadow-2xl text-center max-w-sm border border-slate-800 transform transition hover:scale-105 m-4">
-                                <div class="w-16 h-16 bg-gradient-to-tr from-amber-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
-                                    <i class="fa-solid fa-lock text-white text-2xl"></i>
+                            <div class="bg-slate-950 p-8 rounded-3xl border border-slate-800 shadow-2xl max-w-sm w-full transform hover:scale-105 transition-transform duration-300">
+                                <div class="w-16 h-16 bg-gradient-to-br from-amber-400 to-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-amber-500/30">
+                                    <i class="fa-solid fa-lock text-2xl text-slate-950"></i>
                                 </div>
-                                <h3 class="text-xl font-black text-white mb-2">Passez en mode PRO</h3>
-                                <p class="text-slate-400 text-sm mb-6 leading-relaxed">Débloquez la géolocalisation de vos clients, activez le bouton "Suivre" et bâtissez votre communauté.</p>
-                                <a href="upgrade.php" class="block w-full bg-amber-500 hover:bg-amber-400 text-slate-900 font-black py-3 rounded-xl transition shadow-[0_0_15px_rgba(245,158,11,0.4)]">
+                                <h3 class="text-xl font-black text-white mb-2 text-center">Passez en mode PRO</h3>
+                                <p class="text-slate-400 text-sm mb-6 leading-relaxed text-center">Débloquez la géolocalisation, les annonces illimitées et bâtissez votre communauté.</p>
+                                <a href="/man_go/pricing.php" class="block w-full bg-amber-500 hover:bg-amber-400 text-slate-900 text-center font-black py-3 rounded-xl transition shadow-[0_0_15px_rgba(245,158,11,0.4)]">
                                     Voir les abonnements
                                 </a>
                             </div>

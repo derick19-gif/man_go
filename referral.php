@@ -44,9 +44,17 @@ $stmtFilleuls = $db->prepare("SELECT firstname, lastname, created_at, role_id FR
 $stmtFilleuls->execute([':user_id' => $userId]);
 $filleuls = $stmtFilleuls->fetchAll(PDO::FETCH_ASSOC);
 
-$clicsLien = 0; 
-$commissionsValidees = 0; 
-$commissionsEnAttente = 0;
+$clicsLien = 0;
+
+// Somme des commissions réellement gagnées
+$stmtComm = $db->prepare("SELECT COALESCE(SUM(commission_amount), 0) as total FROM referral_commissions WHERE referrer_id = ? AND status = 'approved'");
+$stmtComm->execute([$userId]);
+$commissionsValidees = (float)$stmtComm->fetch(PDO::FETCH_ASSOC)['total'];
+
+// Somme des commissions en attente (optionnel)
+$stmtPending = $db->prepare("SELECT COALESCE(SUM(commission_amount), 0) as total FROM referral_commissions WHERE referrer_id = ? AND status = 'pending'");
+$stmtPending->execute([$userId]);
+$commissionsEnAttente = (float)$stmtPending->fetch(PDO::FETCH_ASSOC)['total'];
 $commissionPercent = defined('REFERRAL_COMMISSION_PERCENT') ? REFERRAL_COMMISSION_PERCENT : 20;
 
 $pageTitle = "Programme Ambassadeur & Affiliation - MAN GO";
