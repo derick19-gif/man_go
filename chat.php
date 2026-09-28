@@ -67,7 +67,12 @@ if ($vendor_id !== null) {
         .message-time { font-size: 0.7rem; margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
         .message-sent .message-time { color: rgba(255,255,255,0.7); }
         .message-received .message-time { color: #64748b; }
-        
+        .message-sent { align-self: flex-end; background-color: var(--mango-dark); color: #ffffff; border-bottom-right-radius: 4px; }
+        .message-received { align-self: flex-start; background-color: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; }
+        /* NOUVEAU: Style de la bulle IA */
+        .message-ai { align-self: flex-start; background: linear-gradient(135deg, #fffbeb, #fef3c7); color: #92400e; border: 1px solid #fde68a; border-bottom-left-radius: 4px; border-top-left-radius: 16px; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1), 0 2px 4px -1px rgba(245, 158, 11, 0.06); }
+        .message-ai .message-time { color: #b45309; }
+
         .chat-input-area { padding: 16px 20px; background: #ffffff; border-top: 1px solid #e2e8f0; }
         .shield-notice { background-color: #fffbeb; border: 1px solid #fef3c7; color: #d97706; padding: 8px 14px; font-size: 0.8rem; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; }
         
@@ -408,9 +413,18 @@ if ($vendor_id !== null) {
 
             messages.forEach(msg => {
                 const isSent = (msg.sender_id == CURRENT_USER_ID);
-                const bubbleClass = isSent ? 'message-sent' : 'message-received';
+                const isAi = (msg.is_ai == 1); // Vérifie si c'est un message généré par l'IA
+                
+                // Détermine la classe CSS de la bulle (Sent, Received, ou AI)
+                let bubbleClass = 'message-received';
+                if (isSent) {
+                    bubbleClass = 'message-sent';
+                } else if (isAi) {
+                    bubbleClass = 'message-ai';
+                }
+
                 const isDeleted = msg.message.indexOf('🚫') !== -1;
-                const isStarred = starredMsgs.includes(msg.id); // Vérifie si ce message est important
+                const isStarred = starredMsgs.includes(msg.id); 
                 
                 let readStatus = '';
                 if (isSent) {
@@ -423,35 +437,26 @@ if ($vendor_id !== null) {
                 if (!isDeleted) {
                     let menuItems = '';
                     
-                    // Options COMMUNES (Copier, Répondre, Transférer)
+                    // L'IA n'a pas besoin de toutes les options (on peut traduire, mais on ne signale pas sa propre IA)
                     menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="navigator.clipboard.writeText('${safeText}'); alert('Message copié !'); return false;"><i class="fa-regular fa-copy me-2 text-secondary"></i> Copier</a></li>`;
                     menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="replyToMessage('${safeText}'); return false;"><i class="fa-solid fa-reply me-2 text-secondary"></i> Répondre</a></li>`;
-                    if (navigator.share) {
-                        menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="navigator.share({title: 'MAN GO Message', text: '${safeText}'}); return false;"><i class="fa-solid fa-share me-2 text-secondary"></i> Transférer</a></li>`;
+                    
+                    if (!isSent && !isAi) {
+                        menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="translateMessage(${msg.id}, '${safeText}'); return false;"><i class="fa-solid fa-language me-2 text-info"></i> Traduire</a></li>`;
                     }
                     
-                    // NOUVEAU : Option Important (Étoile)
-                    let starText = isStarred ? "Retirer des favoris" : "Marquer comme important";
-                    let starIcon = isStarred ? "fa-solid fa-star text-secondary" : "fa-regular fa-star text-warning";
-                    menuItems += `<li><a class="dropdown-item py-2 text-dark fw-bold" href="#" onclick="toggleImportant(${msg.id}); return false;"><i class="${starIcon} me-2"></i> ${starText}</a></li>`;
-                    
-                    menuItems += `<li><hr class="dropdown-divider"></li>`;
-                    
-                    // Options SPÉCIFIQUES
                     if (isSent) {
+                        menuItems += `<li><hr class="dropdown-divider"></li>`;
                         menuItems += `<li><a class="dropdown-item text-danger py-2" href="#" onclick="deleteMessage(${msg.id}); return false;"><i class="fa-regular fa-trash-can me-2"></i> Supprimer</a></li>`;
-                    } else {
-                        menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="translateMessage(${msg.id}, '${safeText}'); return false;"><i class="fa-solid fa-language me-2 text-info"></i> Traduire</a></li>`;
-                        menuItems += `<li><a class="dropdown-item text-danger py-2" href="#" onclick="alert('Message signalé à l\\'équipe de modération.'); return false;"><i class="fa-regular fa-flag me-2"></i> Signaler</a></li>`;
                     }
 
-                    let chevronColor = isSent ? 'text-white-50' : 'text-secondary';
+                    let chevronColor = isSent ? 'text-white-50' : (isAi ? 'text-warning' : 'text-secondary');
                     actionsMenu = `
                         <div class="dropdown" style="position: absolute; top: 5px; right: 8px;">
                             <button class="btn btn-sm p-0 border-0 ${chevronColor}" type="button" data-bs-toggle="dropdown">
                                 <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem;"></i>
                             </button>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="font-size: 0.9rem; min-width: 220px; z-index: 1050; border-radius: 8px;">
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="font-size: 0.9rem; min-width: 150px; z-index: 1050; border-radius: 8px;">
                                 ${menuItems}
                             </ul>
                         </div>
@@ -459,33 +464,24 @@ if ($vendor_id !== null) {
                 }
 
                 let displayMessage = escapeHtml(msg.message);
-                let customBubbleStyle = !isDeleted ? 'padding-right: 25px;' : '';
                 
-                // Transformation Carte GPS
-                const locRegex = /📍 Ma position : https:\/\/www\.google\.com\/maps\?q=([0-9.-]+),([0-9.-]+)/;
-                const match = msg.message.match(locRegex);
-                
-                if (match) {
-                    const lat = match[1]; const lng = match[2];
-                    displayMessage = `
-                        <div class="shadow-sm mt-1" style="width: 240px; overflow: hidden; border-radius: 8px; background: #fff;">
-                            <div style="padding: 6px; font-size: 0.75rem; color: #000; text-align: center; font-weight: bold; border-bottom: 1px solid #eee;">
-                                <i class="fa-solid fa-location-dot text-danger me-1"></i> Position partagée
+                // NOUVEAU: Si c'est un message IA, on ajoute une petite entête visuelle
+                let aiHeader = '';
+                if (isAi && !isDeleted) {
+                    // On retire le texte brut "🤖 IA : " que le backend a ajouté pour le remplacer par un bel affichage HTML
+                    displayMessage = displayMessage.replace(/^🤖 IA : /, '').replace(/^🤖 Réponse automatique : /, '');
+                    
+                    aiHeader = `
+                        <div class="d-flex align-items-center mb-2 pb-1 border-bottom" style="border-color: rgba(245,158,11,0.2) !important;">
+                            <div class="bg-amber-100 text-amber-600 rounded-circle d-flex align-items-center justify-center me-2" style="width:24px; height:24px; font-size:0.7rem;">
+                                <i class="fa-solid fa-robot"></i>
                             </div>
-                            <iframe width="240" height="130" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="https://maps.google.com/maps?q=${lat},${lng}&z=14&output=embed" style="display: block; border: none;"></iframe>
-                            <a href="https://www.google.com/maps?q=${lat},${lng}" target="_blank" style="display: block; padding: 8px; text-align: center; text-decoration: none; font-size: 0.8rem; font-weight: bold; color: var(--mango-orange); background: #fff;">
-                                Ouvrir dans Maps <i class="fa-solid fa-arrow-up-right-from-square ms-1"></i>
-                            </a>
+                            <span class="font-bold text-xs" style="color: #b45309; text-transform: uppercase; letter-spacing: 0.5px;">Assistant IA</span>
                         </div>
                     `;
-                    customBubbleStyle += ' width: max-content; padding: 6px; padding-right: 28px;';
-                } else {
-                    displayMessage = `<div style="white-space: pre-wrap; word-break: break-word;">${displayMessage}</div>`;
                 }
 
-                // Affichage de l'étoile si le message est important
-                let starBadge = isStarred ? '<div style="position:absolute; top:-10px; left:-10px; background:#fff; border-radius:50%; padding:2px; box-shadow:0 2px 4px rgba(0,0,0,0.1);"><i class="fa-solid fa-star text-warning"></i></div>' : '';
-
+                let customBubbleStyle = !isDeleted ? 'padding-right: 25px;' : '';
                 // ==========================================================
                 // FORMATAGE DU BLOC "RÉPONSE" (Style WhatsApp)
                 // ==========================================================
@@ -513,6 +509,9 @@ if ($vendor_id !== null) {
                     <div class="message-bubble ${bubbleClass} d-flex flex-column shadow-sm" id="msg-${msg.id}" style="${customBubbleStyle}">
                         ${starBadge}
                         ${actionsMenu}
+                        
+                        <!-- L'en-tête IA s'affiche ici si c'est un message IA -->
+                        ${aiHeader}
                         
                         <!-- Le bloc de citation WhatsApp s'affiche ici s'il existe -->
                         ${replyBlock}
