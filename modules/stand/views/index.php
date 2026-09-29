@@ -90,18 +90,28 @@ require_once __DIR__ . '/../../../themes/default/templates/layouts/header.php';
                 <?php 
                     $logo = !empty($stand['logo']) ? $baseUrl . '/uploads/stands/' . htmlspecialchars($stand['logo']) : $baseUrl . '/assets/images/default-shop.png';
                     $banner = !empty($stand['banner']) ? $baseUrl . '/uploads/stands/' . htmlspecialchars($stand['banner']) : $baseUrl . '/assets/images/default-banner.jpg';
+                    $isVip = isset($stand['is_premium']) && $stand['is_premium'] == 1; // Vérification du statut VIP
                 ?>
-                <div class="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group">
+                <div class="bg-white rounded-2xl border <?= $isVip ? 'border-amber-400 shadow-amber-500/20' : 'border-slate-200 shadow-sm' ?> hover:shadow-xl transition-all duration-300 flex flex-col overflow-hidden group relative">
+                    
+                    <?php if ($isVip): ?>
+                        <!-- Badge VIP Exclusif -->
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-400 to-amber-600 z-20"></div>
+                        <div class="absolute top-3 left-3 bg-gradient-to-r from-amber-400 to-amber-600 text-white text-[10px] font-black px-3 py-1 rounded-full shadow-lg z-20 flex items-center gap-1">
+                            <i class="fa-solid fa-crown"></i> VIP CERTIFIÉ
+                        </div>
+                    <?php endif; ?>
+
                     <div class="h-28 bg-slate-200 relative overflow-hidden">
                         <img src="<?= $banner ?>" alt="<?= htmlspecialchars($stand['name']) ?>" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=500&auto=format&fit=crop'">
-                        <span class="absolute top-3 right-3 bg-[#0B132B]/80 text-white text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm">
+                        <span class="absolute top-3 right-3 bg-[#0B132B]/80 text-white text-[10px] font-bold px-2.5 py-1 rounded-full backdrop-blur-sm z-10">
                             <?= (int) ($stand['total_annonces'] ?? 0) ?> annonce<?= ($stand['total_annonces'] ?? 0) > 1 ? 's' : '' ?>
                         </span>
                     </div>
 
                     <div class="p-5 pt-0 flex-grow flex flex-col relative">
-                        <div class="-mt-10 mb-3 flex items-end justify-between">
-                            <div class="w-16 h-16 rounded-2xl border-4 border-white bg-white shadow-md overflow-hidden flex-shrink-0">
+                        <div class="-mt-10 mb-3 flex items-end justify-between relative z-10">
+                            <div class="w-16 h-16 rounded-2xl border-4 <?= $isVip ? 'border-amber-100' : 'border-white' ?> bg-white shadow-md overflow-hidden flex-shrink-0">
                                 <img src="<?= $logo ?>" alt="Logo <?= htmlspecialchars($stand['name']) ?>" class="w-full h-full object-cover" onerror="this.src='https://ui-avatars.com/api/?name=<?= urlencode($stand['name']) ?>&background=0B132B&color=F59E0B'">
                             </div>
                             <?php if (!empty($stand['city'])): ?>
@@ -111,12 +121,15 @@ require_once __DIR__ . '/../../../themes/default/templates/layouts/header.php';
                             <?php endif; ?>
                         </div>
 
-                        <h3 class="text-base font-bold text-slate-800 line-clamp-1 group-hover:text-[#F59E0B] transition-colors">
+                        <h3 class="text-base font-bold text-slate-800 line-clamp-1 group-hover:text-[#F59E0B] transition-colors flex items-center gap-2">
                             <?= htmlspecialchars($stand['name']) ?>
+                            <?php if ($isVip): ?>
+                                <i class="fa-solid fa-circle-check text-blue-500 text-sm" title="Vendeur Vérifié"></i>
+                            <?php endif; ?>
                         </h3>
 
                         <?php if (!empty($stand['category'])): ?>
-                            <span class="text-[11px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md w-max my-1.5">
+                            <span class="text-[11px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md w-max my-1.5 border border-amber-100">
                                 <?= htmlspecialchars($stand['category']) ?>
                             </span>
                         <?php endif; ?>
@@ -124,19 +137,23 @@ require_once __DIR__ . '/../../../themes/default/templates/layouts/header.php';
                         <p class="text-xs text-slate-500 line-clamp-2 my-2 flex-grow">
                             <?= htmlspecialchars($stand['description'] ?? 'Bienvenue dans notre boutique officielle sur MAN GO Marketplace !') ?>
                         </p>
+                        
+                        <div class="text-[10px] font-bold text-slate-400 mb-3 flex items-center gap-1">
+                            <i class="fa-solid fa-user-tie"></i> Géré par : <?= htmlspecialchars($stand['vendor_name'] ?? 'Inconnu') ?>
+                        </div>
 
-                        <div class="pt-3 border-t border-slate-100 flex items-center gap-2 mt-auto">
-                            <a href="<?= $baseUrl ?>/stands/<?= urlencode($stand['slug'] ?? (string)$stand['id']) ?>" 
-                               class="flex-grow bg-[#0B132B] hover:bg-slate-800 text-white font-bold py-2.5 px-3 rounded-xl text-xs text-center transition-all flex items-center justify-center gap-1.5">
-                                <span>Visiter le Stand</span>
+                        <div class="pt-3 border-t <?= $isVip ? 'border-amber-100' : 'border-slate-100' ?> flex items-center gap-2 mt-auto">
+                            <a href="<?= $baseUrl ?>/stands/detail?id=<?= $stand['id'] ?>" 
+                               class="flex-grow bg-[#0B132B] hover:bg-slate-800 text-white font-bold py-2.5 px-3 rounded-xl text-xs text-center transition-all flex items-center justify-center gap-1.5 shadow-md">
+                                <span>Visiter la Boutique</span>
                                 <i class="fa-solid fa-arrow-right text-[10px]"></i>
                             </a>
 
-                            <?php if (!empty($stand['whatsapp'])): ?>
-                                <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $stand['whatsapp']) ?>" 
+                            <?php if (!empty($stand['phone'])): ?>
+                                <a href="https://wa.me/<?= preg_replace('/[^0-9]/', '', $stand['phone']) ?>?text=Bonjour,%20je%20viens%20depuis%20votre%20vitrine%20MAN%20GO." 
                                    target="_blank" 
                                    title="Contacter sur WhatsApp"
-                                   class="bg-emerald-500 hover:bg-emerald-600 text-white w-9 h-9 rounded-xl flex items-center justify-center transition-all shadow-md shadow-emerald-500/20">
+                                   class="bg-emerald-500 hover:bg-emerald-600 text-white w-9 h-9 rounded-xl flex items-center justify-center transition-all shadow-md shadow-emerald-500/30">
                                     <i class="fa-brands fa-whatsapp text-base"></i>
                                 </a>
                             <?php endif; ?>

@@ -8,15 +8,52 @@ require_once __DIR__ . '/../models/Stand.php';
 class StandController extends Controller {
 
     public function index() {
-        $standModel = new Stand();
         $search   = trim(filter_input(INPUT_GET, 'search', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
         $location = trim(filter_input(INPUT_GET, 'location', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
         $category = trim(filter_input(INPUT_GET, 'category', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
 
-        $stands = method_exists($standModel, 'getActiveStands') ? $standModel->getActiveStands($search, $location, $category) : [];
+        $dbInstance = \App\Core\Database::getInstance();
+        $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
+
+        // CORRECTION : Ajout de la sous-requête pour compter les annonces (listings) actives du vendeur
+        $sql = "SELECT s.*, 
+                       CONCAT(u.firstname, ' ', u.lastname) as vendor_name, 
+                       u.is_premium,
+                       (SELECT COUNT(*) FROM listings l WHERE l.user_id = s.user_id AND LOWER(l.status) = 'active') as total_annonces
+                FROM stands s 
+                LEFT JOIN users u ON s.user_id = u.id 
+                WHERE LOWER(s.status) = 'active'";
+        
+        $params = [];
+
+        if (!empty($search)) {
+            $sql .= " AND (s.name LIKE :search OR s.description LIKE :search)";
+            $params[':search'] = '%' . $search . '%';
+        }
+        if (!empty($location)) {
+            $sql .= " AND (s.city LIKE :location OR s.address LIKE :location)";
+            $params[':location'] = '%' . $location . '%';
+        }
+        if (!empty($category)) {
+            $sql .= " AND s.category = :category";
+            $params[':category'] = $category;
+        }
+
+        $sql .= " ORDER BY u.is_premium DESC, s.created_at DESC"; 
+
+        try {
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            $stands = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Exception $e) {
+            $stands = [];
+        }
+
+        $totalStands = count($stands);
 
         echo $this->render('index', [
             'stands'      => $stands,
+            'totalStands' => $totalStands,
             'search'      => $search,
             'location'    => $location,
             'category'    => $category
@@ -25,21 +62,54 @@ class StandController extends Controller {
 
     public function detail() {
         $id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-        $standModel = new Stand();
-        $stand = $standModel->find($id);
-
-        if (!$stand) {
+        
+        if (!$id) {
             http_response_code(404);
-            echo "Boutique introuvable.";
+            echo "Lien de la boutique invalide.";
             return;
         }
 
-        $listings = $standModel->getStandListings($id);
+        // Connexion directe et forcée à la base de données
+        $dbInstance = \App\Core\Database::getInstance();
+        $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
+        $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        echo $this->render('detail', [
-            'stand'    => $stand,
-            'listings' => $listings
-        ]);
+        try {
+            // 1. Récupération du Stand (avec la bonne concaténation du nom)
+            $stmt = $db->prepare("SELECT s.*, CONCAT(u.firstname, ' ', u.lastname) as vendor_name, u.phone as vendor_phone, u.is_premium 
+                                  FROM stands s 
+                                  LEFT JOIN users u ON s.user_id = u.id 
+                                  WHERE s.id = :id LIMIT 1");
+            $stmt->execute([':id' => $id]);
+            $stand = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$stand) {
+                http_response_code(404);
+                echo "<div style='padding:50px; text-align:center; font-family:sans-serif;'>
+                        <h2 style='color:#0f172a;'>Cette boutique est introuvable ou a été désactivée.</h2>
+                        <br><a href='../stands' style='padding:10px 20px; background:#f59e0b; color:white; text-decoration:none; border-radius:8px;'>Retour aux boutiques</a>
+                      </div>";
+                return;
+            }
+
+            // 2. Récupération des annonces du vendeur (liées par le user_id)
+            $stmtListings = $db->prepare("SELECT * FROM listings WHERE user_id = :user_id AND LOWER(status) = 'active' ORDER BY created_at DESC");
+            $stmtListings->execute([':user_id' => $stand['user_id']]);
+            $listings = $stmtListings->fetchAll(\PDO::FETCH_ASSOC);
+
+            // 3. Envoi à la vue
+            echo $this->render('detail', [
+                'stand'    => $stand,
+                'listings' => $listings
+            ]);
+
+        } catch (\PDOException $e) {
+            // Si une colonne manque, l'erreur s'affichera clairement !
+            die("<div style='background:#111; color:white; padding:20px; border-left:8px solid red; font-family:sans-serif;'>
+                    <h3 style='color:red;'>🚨 ERREUR SQL DANS DETAIL()</h3>
+                    <p>" . $e->getMessage() . "</p>
+                 </div>");
+        }
     }
 
     public function create() {
@@ -80,16 +150,11 @@ class StandController extends Controller {
              $address = trim($_POST['coverage_zone']);
         }
 
-        // Création du SLUG obligatoire (ex: "Cabinet Notarial" devient "cabinet-notarial-12")
-        // On ajoute l'ID utilisateur à la fin pour garantir que le slug est UNIQUE
         $slug = strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $name)) . '-' . $userId;
         $slug = trim($slug, '-');
 
-        // Connexion directe
         $dbInstance = \App\Core\Database::getInstance();
         $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
-        
-        // Mode strict pour voir les erreurs s'il en reste !
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         try {
@@ -97,7 +162,6 @@ class StandController extends Controller {
             $stmtCheck->execute([$userId]);
             $existingStand = $stmtCheck->fetch(\PDO::FETCH_ASSOC);
 
-            // --- VERIFICATION ET UPLOAD DU LOGO ---
             $logoFileName = null;
             $hasUploadedLogo = isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK;
 
@@ -109,24 +173,21 @@ class StandController extends Controller {
             if ($hasUploadedLogo) {
                 $tmpName = $_FILES['logo']['tmp_name'];
                 $ext = strtolower(pathinfo($_FILES['logo']['name'], PATHINFO_EXTENSION));
-                
                 $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
+                
                 if (!in_array($ext, $allowedExtensions)) {
                     header('Location: create?error=invalid_format');
                     exit;
                 }
 
                 $logoFileName = 'logo_' . $userId . '_' . time() . '.' . $ext; 
-                
                 $uploadDir = dirname(dirname(dirname(__DIR__))) . '/uploads/stands/';
-                if (!is_dir($uploadDir)) {
-                    mkdir($uploadDir, 0777, true);
-                }
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
+                
                 move_uploaded_file($tmpName, $uploadDir . $logoFileName);
             }
 
             if ($existingStand) {
-                // --- MISE À JOUR ---
                 $existingId = $existingStand['id'];
                 $finalLogo = $logoFileName ? $logoFileName : ($existingStand['logo'] ?? 'default-shop.png');
                 
@@ -137,10 +198,7 @@ class StandController extends Controller {
                 header('Location: create?msg=updated');
                 exit;
             } else {
-                // --- CRÉATION ---
                 $finalLogo = $logoFileName; 
-                
-                // On inclut bien le "slug", "category", "city", etc.
                 $sql = "INSERT INTO stands (user_id, name, slug, description, category, city, address, phone, website, logo, status, created_at) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', NOW())";
                 $stmtInsert = $db->prepare($sql);
@@ -158,3 +216,4 @@ class StandController extends Controller {
         }
     }
 }
+?>

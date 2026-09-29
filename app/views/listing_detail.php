@@ -1,26 +1,45 @@
 <?php
 // listing-detail.php
-require_once __DIR__ . '/core/Database.php';
-require_once __DIR__ . '/core/Session.php';
+
+// Définition d'un chemin de base robuste vers la racine du projet
+$projectRoot = dirname(dirname(__DIR__)); // Remonte de app/views à man_go
+
+// Inclusions avec le chemin absolu
+require_once $projectRoot . '/core/Database.php';
+require_once $projectRoot . '/core/Session.php';
 
 Session::init();
 
-$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-if (!$id || $id <= 0) { header('Location: listings.php'); exit; }
+// Sécurité : On s'assure de récupérer l'ID depuis l'URL si le contrôleur l'a perdu
+$id = $id ?? (isset($_GET['id']) ? (int)$_GET['id'] : 0);
 
-$db = \App\Core\Database::connect();
+if (!$id || $id <= 0) { 
+    header('Location: ' . (defined('APP_URL') ? APP_URL : '/man_go') . '/listings'); 
+    exit; 
+}
+
+$db = \App\Core\Database::getInstance();
+if (method_exists($db, 'getConnection')) {
+    $db = $db->getConnection();
+}
+
 $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
 $currentUserId = $_SESSION['user_id'] ?? null;
 $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
 
 try {
-    // AJOUT : On récupère aussi u.is_premium
+    // CORRECTION MAJEURE : On remplace u.full_name par CONCAT(u.firstname, ' ', u.lastname)
     $stmt = $db->prepare("
-        SELECT l.*, c.name_key AS category_name, u.full_name AS seller_name, u.phone AS seller_account_phone, u.created_at AS seller_joined, u.is_premium AS seller_is_premium
+        SELECT l.*, 
+               c.name_key AS category_name, 
+               CONCAT(u.firstname, ' ', u.lastname) AS seller_name, 
+               u.phone AS seller_account_phone, 
+               u.created_at AS seller_joined, 
+               u.is_premium AS seller_is_premium
         FROM listings l 
         LEFT JOIN categories c ON l.category_id = c.id 
         LEFT JOIN users u ON l.user_id = u.id
-        WHERE l.id = :id AND l.status = 'active'
+        WHERE l.id = :id AND LOWER(l.status) = 'active'
         LIMIT 1
     ");
     $stmt->execute([':id' => $id]);
@@ -48,18 +67,30 @@ try {
     $rawCatName = strtolower(trim($listing['category_name'] ?? ''));
     $translatedCategory = $categoryTranslations[$lang][$rawCatName] ?? 'Général';
 
-    // MULTI-IMAGES
+    // MULTI-IMAGES AVEC CORRECTION DE CHEMIN ABSOLU
     $allImages = [];
     $imgPath = trim($listing['image_path'] ?? '');
-    if (!empty($imgPath)) $allImages[] = $baseUrl . '/' . ltrim($imgPath, '/');
+    
+    // CORRECTION : On utilise le chemin exact de la DB sans forcer "uploads/"
+    if (!empty($imgPath) && $imgPath !== 'assets/images/placeholder.jpg') {
+        $allImages[] = rtrim($baseUrl, '/') . '/' . ltrim($imgPath, '/');
+    }
+    
     try {
         $stmtImg = $db->prepare("SELECT image_path FROM listing_images WHERE listing_id = :id ORDER BY created_at ASC");
         $stmtImg->execute([':id' => $id]);
         while ($row = $stmtImg->fetch(PDO::FETCH_ASSOC)) {
-            if (!empty($row['image_path'])) $allImages[] = $baseUrl . '/' . ltrim($row['image_path'], '/');
+            $subImgPath = trim($row['image_path'] ?? '');
+            if (!empty($subImgPath)) {
+                $allImages[] = rtrim($baseUrl, '/') . '/' . ltrim($subImgPath, '/');
+            }
         }
     } catch(Exception $e) {}
-    if (empty($allImages)) $allImages[] = 'https://via.placeholder.com/800x600/1e293b/f59e0b?text=Image+Non+Disponible';
+    
+    // Fallback propre en cas d'absence totale d'image
+    if (empty($allImages)) {
+        $allImages[] = rtrim($baseUrl, '/') . '/assets/images/default-product.jpg';
+    }
 
     $vendorName = trim($listing['seller_name'] ?? 'Vendeur MAN GO');
     $vendorInitial = strtoupper(substr($vendorName, 0, 1));
@@ -67,7 +98,7 @@ try {
     $clean_phone = preg_replace('/[^0-9]/', '', $listing['phone'] ?? $listing['seller_account_phone'] ?? '');
 
     // Génération du lien de l'annonce pour le partage
-    $currentListingUrl = urlencode("http://localhost$baseUrl/listing-detail.php?id=" . $listing['id']);
+    $currentListingUrl = urlencode("http://localhost$baseUrl/listing_detail?id=" . $listing['id']);
     $listingTitleUrl = urlencode($listing['title']);
 
 } catch (Exception $e) { die("Erreur : " . htmlspecialchars($e->getMessage())); }
@@ -83,8 +114,14 @@ try {
 </head>
 <body class="bg-slate-50">
 <?php 
-$headerPath = __DIR__ . '/app/views/layouts/header.php';
-if (file_exists($headerPath)) require_once $headerPath;
+$headerPath = $projectRoot . '/themes/default/templates/layouts/header.php';
+if (file_exists($headerPath)) {
+    require_once $headerPath;
+} else {
+    // Fallback au cas où l'arborescence est différente
+    $headerFallback = $projectRoot . '/app/views/layouts/header.php';
+    if(file_exists($headerFallback)) require_once $headerFallback;
+}
 ?>
 
 <div class="bg-slate-50 min-h-screen py-10">
@@ -99,14 +136,16 @@ if (file_exists($headerPath)) require_once $headerPath;
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div class="lg:col-span-2 space-y-8">
                 <div class="bg-white rounded-3xl border border-slate-200 p-4 shadow-sm">
-                    <div class="w-full h-80 sm:h-[500px] bg-slate-100 rounded-2xl overflow-hidden relative mb-4">
-                        <img id="mainGalleryImage" src="<?= htmlspecialchars($allImages[0]) ?>" class="w-full h-full object-cover transition duration-300">
+                    <div class="w-full h-80 sm:h-[500px] bg-slate-100 rounded-2xl overflow-hidden relative mb-4 flex items-center justify-center">
+                        <!-- CORRECTION : Remplacement du onerror d'Unsplash par l'image par défaut locale -->
+                        <img id="mainGalleryImage" src="<?= htmlspecialchars($allImages[0]) ?>" class="w-full h-full object-contain transition duration-300" onerror="this.src='<?= rtrim($baseUrl, '/') ?>/assets/images/default-product.jpg'">
                     </div>
                     <?php if(count($allImages) > 1): ?>
                     <div class="flex space-x-3 overflow-x-auto pb-2">
                         <?php foreach($allImages as $imgUrl): ?>
-                            <div class="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden cursor-pointer border-2 hover:border-amber-500" onclick="document.getElementById('mainGalleryImage').src='<?= htmlspecialchars($imgUrl) ?>'">
-                                <img src="<?= htmlspecialchars($imgUrl) ?>" class="w-full h-full object-cover">
+                            <div class="flex-shrink-0 w-24 h-24 rounded-xl overflow-hidden cursor-pointer border-2 hover:border-amber-500 bg-slate-100 flex items-center justify-center" onclick="document.getElementById('mainGalleryImage').src='<?= htmlspecialchars($imgUrl) ?>'">
+                                <!-- CORRECTION : onerror local pour la galerie -->
+                                <img src="<?= htmlspecialchars($imgUrl) ?>" class="w-full h-full object-cover" onerror="this.src='<?= rtrim($baseUrl, '/') ?>/assets/images/default-product.jpg'">
                             </div>
                         <?php endforeach; ?>
                     </div>
@@ -123,13 +162,13 @@ if (file_exists($headerPath)) require_once $headerPath;
                 <!-- PRIX ET ACTIONS -->
                 <div class="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm text-center">
                     <h1 class="text-2xl font-black text-slate-900 mb-4"><?= htmlspecialchars($listing['title']) ?></h1>
-                    <p class="text-4xl font-black text-amber-500 mb-2"><?= number_format($listing['price'], 0, ',', ' ') ?> <span class="text-xl">FCFA</span></p>
+                    <p class="text-4xl font-black text-amber-500 mb-2"><?= number_format($listing['price'], 0, ',', ' ') ?> <span class="text-xl"><?= htmlspecialchars($listing['currency'] ?? 'FCFA') ?></span></p>
                     <?php if(!empty($listing['original_price']) && $listing['original_price'] > $listing['price']): ?>
-                        <p class="text-lg text-slate-400 line-through font-bold mb-4"><?= number_format($listing['original_price'], 0, ',', ' ') ?> FCFA</p>
+                        <p class="text-lg text-slate-400 line-through font-bold mb-4"><?= number_format($listing['original_price'], 0, ',', ' ') ?> <?= htmlspecialchars($listing['currency'] ?? 'FCFA') ?></p>
                     <?php endif; ?>
 
                     <?php if($canModifyOrDelete): ?>
-                        <a href="<?= $baseUrl ?>/publish.php?id=<?= $listing['id'] ?>" class="w-full block bg-amber-100 text-amber-800 font-black py-3 rounded-xl mb-3"><i class="fa-solid fa-pen-to-square"></i> Modifier l'annonce</a>
+                        <a href="<?= $baseUrl ?>/publish?id=<?= $listing['id'] ?>" class="w-full block bg-amber-100 text-amber-800 font-black py-3 rounded-xl mb-3"><i class="fa-solid fa-pen-to-square"></i> Modifier l'annonce</a>
                         
                         <!-- MODULE PARTAGE RÉSEAUX SOCIAUX (PREMIUM) -->
                         <?php if($sellerIsPremium): ?>

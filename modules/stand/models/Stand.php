@@ -25,7 +25,11 @@ class Stand extends Model {
 
     public function find($id) {
         if (!$this->db) return null;
-        $stmt = $this->db->prepare("SELECT s.*, u.name as vendor_name, u.phone as vendor_phone FROM {$this->table} s LEFT JOIN users u ON s.user_id = u.id WHERE s.id = :id LIMIT 1");
+        // CORRECTION ICI : u.name remplacé par CONCAT(u.firstname, ' ', u.lastname)
+        $stmt = $this->db->prepare("SELECT s.*, CONCAT(u.firstname, ' ', u.lastname) as vendor_name, u.phone as vendor_phone, u.is_premium 
+                                    FROM {$this->table} s 
+                                    LEFT JOIN users u ON s.user_id = u.id 
+                                    WHERE s.id = :id LIMIT 1");
         $stmt->execute([':id' => $id]);
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
@@ -43,9 +47,12 @@ class Stand extends Model {
     public function getActiveStands($search = '', $location = '', $category = '') {
         if (!$this->db) return [];
 
-        // ATTENTION : On s'assure que le statut est bien 'ACTIVE' en majuscules
-        // car votre base de données utilise un ENUM('PENDING', 'ACTIVE', 'SUSPENDED')
-        $sql = "SELECT s.*, u.name as vendor_name FROM {$this->table} s LEFT JOIN users u ON s.user_id = u.id WHERE s.status = 'active'";
+        // CORRECTION : u.is_premium (car la colonne est dans users, pas dans stands)
+        $sql = "SELECT s.*, CONCAT(u.firstname, ' ', u.lastname) as vendor_name, u.is_premium 
+                FROM {$this->table} s 
+                LEFT JOIN users u ON s.user_id = u.id 
+                WHERE LOWER(s.status) = 'active'";
+        
         $params = [];
 
         // Filtre par mot-clé (Nom ou Description)
@@ -66,13 +73,17 @@ class Stand extends Model {
             $params[':category'] = $category;
         }
 
-        // L'ASTUCE BUSINESS : On trie d'abord par Compte Premium (is_premium DESC)
-        $sql .= " ORDER BY s.is_premium DESC, s.created_at DESC"; 
+        // L'ASTUCE BUSINESS : On trie d'abord par Compte Premium (u.is_premium DESC)
+        $sql .= " ORDER BY u.is_premium DESC, s.created_at DESC"; 
 
-        $stmt = $this->db->prepare($sql);
-        $stmt->execute($params);
-        
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $this->db->prepare($sql);
+            $stmt->execute($params);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            // COMMANDE ANTI-DEVINETTES : Si le SQL échoue, l'exécution s'arrête et affiche l'erreur exacte !
+            die("<div style='background:red; color:white; padding:20px; font-weight:bold;'>ERREUR SQL EXACTE : " . $e->getMessage() . "</div>");
+        }
     }
 
     // =========================================================================

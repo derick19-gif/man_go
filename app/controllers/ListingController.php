@@ -218,16 +218,14 @@ class ListingController {
     }
 
     // ---------------------------------------------------------
-    // NOUVEAU : Affiche les détails d'une annonce spécifique (Vue)
+    // Affiche les détails d'une annonce spécifique (Vue)
     // ---------------------------------------------------------
     public function show() {
-        // 1. Récupérer l'ID de l'annonce depuis l'URL (?id=X)
         $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-        
         $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
 
         if (!$id) {
-            header("Location: $baseUrl/"); // Retour à l'accueil si pas d'ID
+            header("Location: $baseUrl/");
             exit;
         }
 
@@ -237,11 +235,13 @@ class ListingController {
                 $db = $db->getConnection();
             }
             
-            // 2. Requête SQL pour récupérer l'annonce + les infos du vendeur + la catégorie
+            // CORRECTION EXACTE : On utilise c.name_key (selon phpMyAdmin)
+            // Et on utilise CONCAT pour le nom du vendeur
             $stmt = $db->prepare("
                 SELECT l.*, 
-                       c.name AS category_name,
-                       u.firstname, u.lastname, u.avatar, u.phone AS vendor_phone, u.email, u.created_at as vendor_since
+                       c.name_key AS category_name,
+                       CONCAT(u.firstname, ' ', u.lastname) as vendor_name, 
+                       u.avatar, u.phone AS vendor_phone, u.email, u.created_at as vendor_since
                 FROM listings l
                 LEFT JOIN categories c ON l.category_id = c.id
                 LEFT JOIN users u ON l.user_id = u.id
@@ -250,16 +250,13 @@ class ListingController {
             $stmt->execute([':id' => $id]);
             $listing = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Si l'annonce n'existe pas ou n'est plus active
             if (!$listing) {
                 header("Location: $baseUrl/?error=not_found");
                 exit;
             }
 
-            // 3. Titre de la page pour le SEO
             $pageTitle = $listing['title'] . " - MAN GO";
             
-            // 4. Chargement de la vue (Le HTML que vous allez créer ensuite)
             $viewPath = __DIR__ . '/../views/listing_detail.php';
             if (file_exists($viewPath)) {
                 require_once $viewPath;
@@ -268,7 +265,7 @@ class ListingController {
             }
 
         } catch (Exception $e) {
-            die("Erreur système : " . $e->getMessage());
+            die("<div style='background:red; color:white; padding:20px;'>Erreur système : " . $e->getMessage() . "</div>");
         }
     }
 }
