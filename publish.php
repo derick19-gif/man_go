@@ -143,6 +143,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title><?= $editMode ? 'Modifier' : 'Publier' ?> une annonce - MAN GO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    <style>
+        .choices__inner { background-color: white; border-radius: 0.75rem !important; border: 1px solid #cbd5e1 !important; padding: 0.35rem 1rem !important; font-size: 0.875rem !important; }
+        .choices[data-type*="select-one"] .choices__input { background-color: white; }
+        .choices__list--dropdown { border-radius: 0.75rem; border: 1px solid #cbd5e1; z-index: 50; }
+        .choices__list--dropdown .choices__item--selectable.is-highlighted { background-color: #fffbeb; color: #d97706; }
+    </style>
 </head>
 <body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen">
 <?php 
@@ -173,13 +181,27 @@ if (file_exists($headerPath)) require_once$headerPath;
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div>
                 <label class="block text-xs font-bold text-slate-700 uppercase mb-2">Catégorie *</label>
-                <select name="category_id" required class="w-full px-4 py-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-500 text-sm">
-                    <option value="">Sélectionner</option>
-                    <option value="1" <?= (($existingData['category_id']??0) == 1) ? 'selected' : '' ?>>Électronique & High-Tech</option>
-                    <option value="2" <?= (($existingData['category_id']??0) == 2) ? 'selected' : '' ?>>Services Pro</option>
-                    <option value="3" <?= (($existingData['category_id']??0) == 3) ? 'selected' : '' ?>>Immobilier & Foncier</option>
-                    <option value="4" <?= (($existingData['category_id']??0) == 4) ? 'selected' : '' ?>>Mode & Style</option>
-                    <option value="5" <?= (($existingData['category_id']??0) == 5) ? 'selected' : '' ?>>Véhicules</option>
+                <select name="category_id" id="category_id" required>
+                    <option value="">Sélectionnez ou tapez une catégorie</option>
+                    <option value="1" <?= (($existingData['category_id']??0) == 1) ? 'selected' : '' ?>>Accessoires, Bijoux & Montres</option>
+                    <option value="2" <?= (($existingData['category_id']??0) == 2) ? 'selected' : '' ?>>Alimentation & Supermarché</option>
+                    <option value="3" <?= (($existingData['category_id']??0) == 3) ? 'selected' : '' ?>>Animaux & Accessoires</option>
+                    <option value="4" <?= (($existingData['category_id']??0) == 4) ? 'selected' : '' ?>>Art & Artisanat</option>
+                    <option value="5" <?= (($existingData['category_id']??0) == 5) ? 'selected' : '' ?>>Automobile & Motos (Pièces)</option>
+                    <option value="6" <?= (($existingData['category_id']??0) == 6) ? 'selected' : '' ?>>Beauté, Cosmétiques & Parfums</option>
+                    <option value="7" <?= (($existingData['category_id']??0) == 7) ? 'selected' : '' ?>>Bébé & Puériculture</option>
+                    <option value="8" <?= (($existingData['category_id']??0) == 8) ? 'selected' : '' ?>>Bricolage & Jardinage</option>
+                    <option value="9" <?= (($existingData['category_id']??0) == 9) ? 'selected' : '' ?>>Électroménager</option>
+                    <option value="10" <?= (($existingData['category_id']??0) == 10) ? 'selected' : '' ?>>Électronique, High-Tech & Téléphones</option>
+                    <option value="11" <?= (($existingData['category_id']??0) == 11) ? 'selected' : '' ?>>Fournitures de Bureau & Scolaire</option>
+                    <option value="12" <?= (($existingData['category_id']??0) == 12) ? 'selected' : '' ?>>Immobilier, Terrains & Logements</option>
+                    <option value="13" <?= (($existingData['category_id']??0) == 13) ? 'selected' : '' ?>>Jeux, Jouets & Consoles</option>
+                    <option value="14" <?= (($existingData['category_id']??0) == 14) ? 'selected' : '' ?>>Livres, Musique & Films</option>
+                    <option value="15" <?= (($existingData['category_id']??0) == 15) ? 'selected' : '' ?>>Maison, Meubles & Décoration</option>
+                    <option value="16" <?= (($existingData['category_id']??0) == 16) ? 'selected' : '' ?>>Mode, Vêtements & Chaussures</option>
+                    <option value="17" <?= (($existingData['category_id']??0) == 17) ? 'selected' : '' ?>>Sports & Matériel de loisirs</option>
+                    <option value="18" <?= (($existingData['category_id']??0) == 18) ? 'selected' : '' ?>>Véhicules (Autos, Motos, Vélos)</option>
+                    <option value="99" <?= (($existingData['category_id']??0) == 99) ? 'selected' : '' ?>>Autres / Divers</option>
                 </select>
             </div>
             <div>
@@ -266,6 +288,20 @@ document.addEventListener('DOMContentLoaded', function() {
         renderPreviews();
     }
 });
+</script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const categoryElement = document.getElementById('category_id');
+        if(categoryElement) {
+            new Choices(categoryElement, {
+                searchEnabled: true,
+                searchPlaceholderValue: 'Tapez pour rechercher...',
+                itemSelectText: '',
+                noResultsText: 'Aucune catégorie trouvée, choisissez "Autres"',
+                shouldSort: false
+            });
+        }
+    });
 </script>
 </body>
 </html>

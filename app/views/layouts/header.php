@@ -98,12 +98,56 @@ $showPublishButton = (!$isLoggedIn || in_array($userRole, ['vendor', 'vendeur'])
                 <a href="<?= $baseUrl ?>/register.php" class="text-sm font-bold text-amber-400 border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 px-5 py-2.5 rounded-full transition shadow-sm">Inscription</a>
             <?php endif; ?>
 
-            <!-- LE BOUTON PUBLIER -->
+            <!-- LE BOUTON PUBLIER (Géré par JavaScript pour le Mobile & Desktop) -->
             <?php if($showPublishButton): ?>
-                <a href="<?= $baseUrl ?>/publish.php" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold px-5 py-2.5 rounded-full text-sm transition-all duration-300 shadow-futuristic flex items-center space-x-2 transform hover:-translate-y-0.5">
-                    <i class="fa-solid fa-plus-circle"></i><span>Publier</span>
-                </a>
+                <div class="relative">
+                    <button id="publishDropdownBtn" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-extrabold px-5 py-2.5 rounded-full text-sm transition-all duration-300 shadow-futuristic flex items-center space-x-2 transform focus:outline-none">
+                        <i class="fa-solid fa-plus-circle"></i><span>Publier</span> <i class="fa-solid fa-chevron-down text-[10px] ml-1"></i>
+                    </button>
+                    <!-- Le Menu (Caché par défaut via Tailwind 'hidden') -->
+                    <div id="publishDropdownMenu" class="hidden absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl overflow-hidden z-50 border border-slate-200 origin-top-right transition-all">
+                        <div class="p-2 bg-slate-50 border-b border-slate-100">
+                            <p class="text-[10px] font-black uppercase text-slate-400 tracking-wider">Que voulez-vous publier ?</p>
+                        </div>
+                        <a href="<?= $baseUrl ?>/publish.php" class="flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-600 transition-colors">
+                            <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center mr-3 text-amber-500">
+                                <i class="fa-solid fa-box"></i>
+                            </div>
+                            Vendre un produit physique
+                        </a>
+                        <div class="border-t border-slate-100"></div>
+                        <a href="<?= $baseUrl ?>/publish_service.php" class="flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mr-3 text-blue-500">
+                                <i class="fa-solid fa-handshake"></i>
+                            </div>
+                            Proposer un service
+                        </a>
+                    </div>
+                </div>
             <?php endif; ?>
         </div>
     </div>
 </header>
+
+<script>
+    // JS pour sécuriser le menu déroulant sur PC (clic) et Smartphone (tap)
+    document.addEventListener('DOMContentLoaded', function() {
+        const publishBtn = document.getElementById('publishDropdownBtn');
+        const publishMenu = document.getElementById('publishDropdownMenu');
+
+        if (publishBtn && publishMenu) {
+            // Ouvrir/Fermer au clic sur le bouton
+            publishBtn.addEventListener('click', function(event) {
+                event.stopPropagation(); // Empêche le clic de se propager au document
+                publishMenu.classList.toggle('hidden');
+            });
+
+            // Fermer si l'utilisateur clique n'importe où ailleurs sur l'écran
+            document.addEventListener('click', function(event) {
+                if (!publishBtn.contains(event.target) && !publishMenu.contains(event.target)) {
+                    publishMenu.classList.add('hidden');
+                }
+            });
+        }
+    });
+</script>

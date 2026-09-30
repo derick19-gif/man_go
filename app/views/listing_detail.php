@@ -168,7 +168,7 @@ if (file_exists($headerPath)) {
                     <?php endif; ?>
 
                     <?php if($canModifyOrDelete): ?>
-                        <a href="<?= $baseUrl ?>/publish?id=<?= $listing['id'] ?>" class="w-full block bg-amber-100 text-amber-800 font-black py-3 rounded-xl mb-3"><i class="fa-solid fa-pen-to-square"></i> Modifier l'annonce</a>
+                        <a href="<?= $baseUrl ?>/publish.php?id=<?= $listing['id'] ?>" class="w-full block bg-amber-100 text-amber-800 font-black py-3 rounded-xl mb-3 hover:bg-amber-200 transition-colors"><i class="fa-solid fa-pen-to-square"></i> Modifier l'annonce</a>
                         
                         <!-- MODULE PARTAGE RÉSEAUX SOCIAUX (PREMIUM) -->
                         <?php if($sellerIsPremium): ?>
@@ -188,7 +188,7 @@ if (file_exists($headerPath)) {
                             <button type="submit" class="w-full bg-red-50 text-red-600 font-bold py-3 rounded-xl text-sm"><i class="fa-solid fa-trash"></i> Supprimer</button>
                         </form>
                     <?php else: ?>
-                        <a href="<?= $baseUrl ?>/chat?vendor_id=<?= $listing['user_id'] ?>&listing_id=<?= $listing['id'] ?>" class="w-full block bg-slate-900 text-white font-bold py-4 rounded-xl"><i class="fa-solid fa-message"></i> Contacter le vendeur</a>
+                        <a href="<?= $baseUrl ?>/chat.php?vendor_id=<?= $listing['user_id'] ?>&listing_id=<?= $listing['id'] ?>" class="w-full block bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-colors"><i class="fa-solid fa-message"></i> Contacter le vendeur</a>
                     <?php endif; ?>
                 </div>
             </div>
