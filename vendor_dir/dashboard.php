@@ -217,11 +217,20 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
 
         <!-- CONTENU DU DASHBOARD -->
         <main class="flex-1 overflow-y-auto p-4 sm:p-8 lg:p-10">
-            <header class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8 gap-4">
-                <h3 class="font-extrabold text-2xl text-slate-900 m-0">Bonjour, <?= htmlspecialchars($userName) ?> 👋</h3>
-                <span class="bg-slate-900 text-amber-500 px-4 py-2 rounded-full text-sm font-bold shadow-sm self-start sm:self-auto">
-                    <i class="fa-solid fa-store mr-1"></i> Compte Vendeur
-                </span>
+            <header class="flex flex-col sm:flex-row sm:justify-between sm:items-start sm:items-center mb-8 gap-4">
+                <!-- Côté Gauche : Bonjour + Badge -->
+                <div class="flex items-center gap-3 flex-wrap">
+                    <h3 class="font-extrabold text-2xl text-slate-900 m-0">Bonjour, <?= htmlspecialchars($userName) ?> 👋</h3>
+                    <span class="bg-slate-900 text-amber-500 px-3 py-1 rounded-full text-xs font-black shadow-sm flex items-center">
+                        <i class="fa-solid fa-store mr-1.5"></i> Compte Vendeur
+                    </span>
+                </div>
+                
+                <!-- Côté Droit : Bouton Portefeuille en Vert -->
+                <!-- Le lien est mis en dur avec /man_go/ pour garantir que le clic fonctionne à 100% -->
+                <a href="/man_go/my_wallet.php" class="flex items-center justify-center px-5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-xl transition-all duration-300 font-black shadow-sm border border-emerald-200 group">
+                    <i class="fa-solid fa-wallet mr-2 group-hover:scale-110 transition-transform"></i> Mon Portefeuille
+                </a>
             </header>
 
             <!-- TAB 1: STATISTIQUES -->
@@ -298,6 +307,23 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
                     $stats_locations = [['name' => 'Données indisponibles', 'percent' => 0, 'color' => 'bg-slate-200']];
                 }
                 ?>
+                <!-- BANNIÈRE WATCH TO EARN (ACCÈS RAPIDE) -->
+                <div class="mb-8">
+                    <a href="/man_go/watch_ads.php" class="bg-gradient-to-r from-slate-900 to-slate-800 border border-amber-500/30 hover:border-amber-500 text-white p-6 rounded-3xl shadow-lg flex flex-col sm:flex-row items-center justify-between group transition-all">
+                        <div class="flex items-center gap-5 text-center sm:text-left mb-4 sm:mb-0">
+                            <div class="w-14 h-14 bg-amber-500/20 rounded-full flex items-center justify-center text-amber-500 group-hover:scale-110 transition-transform flex-shrink-0">
+                                <i class="fa-solid fa-bolt text-2xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-black text-xl mb-1">Financer mon compte</h4>
+                                <p class="text-sm text-slate-400">Regardez de courtes vidéos sponsorisées pour gagner des crédits et débloquer vos abonnements Premium gratuitement.</p>
+                            </div>
+                        </div>
+                        <div class="bg-amber-500 text-slate-900 font-black px-6 py-3 rounded-xl text-sm group-hover:bg-amber-400 transition-colors flex-shrink-0 whitespace-nowrap shadow-md">
+                            Gagner des Crédits <i class="fa-solid fa-arrow-right ml-2"></i>
+                        </div>
+                    </a>
+                </div>
 
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 mt-2 gap-4">
                     <div>
@@ -306,8 +332,8 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
                     </div>
                     
                     <?php if (!$isPremium): ?>
-                        <a href="/man_go/pricing.php" class="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg transition-all hover:-translate-y-0.5">
-                            <i class="fa-solid fa-crown text-amber-500"></i> Passer en Premium
+                        <a href="/man_go/pricing.php" class="bg-slate-900 hover:bg-slate-800 text-amber-500 text-sm font-bold py-2 px-4 rounded-xl transition flex items-center border border-slate-700">
+                            <i class="fa-solid fa-crown mr-2"></i> Voir les Forfaits
                         </a>
                     <?php else: ?>
                         <span class="inline-flex items-center gap-2 <?= $planBadgeColor ?> px-4 py-2.5 rounded-xl font-black text-sm border shadow-sm cursor-default">
