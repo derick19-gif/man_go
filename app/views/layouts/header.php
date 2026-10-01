@@ -122,6 +122,13 @@ $showPublishButton = (!$isLoggedIn || in_array($userRole, ['vendor', 'vendeur'])
                             </div>
                             Proposer un service
                         </a>
+                        <div class="border-t border-slate-100"></div>
+                        <a href="<?= $baseUrl ?>/publish_directory.php" class="flex items-center px-4 py-3 text-sm font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-3 text-indigo-500">
+                                <i class="fa-solid fa-globe"></i>
+                            </div>
+                            Référencer un site web
+                        </a>
                     </div>
                 </div>
             <?php endif; ?>
