@@ -8,14 +8,41 @@ require_once __DIR__ . '/../models/Stand.php';
 class StandController extends Controller {
 
     public function index() {
-        $search   = trim(filter_input(INPUT_GET, 'search', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
+        // 1. Récupération intelligente des mots-clés (q ou search)
+        $search   = trim(filter_input(INPUT_GET, 'q', FILTER_SANITIZE_SPECIAL_CHARS) ?: filter_input(INPUT_GET, 'search', FILTER_SANITIZE_SPECIAL_CHARS) ?: '');
         $location = trim(filter_input(INPUT_GET, 'location', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
-        $category = trim(filter_input(INPUT_GET, 'category', FILTER_SANITIZE_SPECIAL_CHARS) ?? '');
+        $category = (int)(filter_input(INPUT_GET, 'category', FILTER_SANITIZE_NUMBER_INT) ?? 0);
 
         $dbInstance = \App\Core\Database::getInstance();
         $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
 
-        // CORRECTION : Ajout de la sous-requête pour compter les annonces (listings) actives du vendeur
+        // =========================================================
+        // 2. CONSTRUCTION DE L'ARBRE DES CATÉGORIES (Parents/Enfants)
+        // =========================================================
+        $categoriesTree = [];
+        try {
+            $stmtCats = $db->query("SELECT id, name_key AS name, parent_id FROM categories ORDER BY name_key ASC");
+            $allCats = $stmtCats->fetchAll(\PDO::FETCH_ASSOC);
+            
+            // Isoler les Parents
+            foreach($allCats as $cat) {
+                if (empty($cat['parent_id'])) {
+                    $categoriesTree[$cat['id']] = ['id' => $cat['id'], 'name' => $cat['name'], 'subcategories' => []];
+                }
+            }
+            // Rattacher les Enfants
+            foreach($allCats as $cat) {
+                if (!empty($cat['parent_id']) && isset($categoriesTree[$cat['parent_id']])) {
+                    $categoriesTree[$cat['parent_id']]['subcategories'][] = $cat;
+                }
+            }
+            // Trier l'arbre de A à Z
+            usort($categoriesTree, function($a, $b) { return strcmp($a['name'], $b['name']); });
+        } catch (\PDOException $e) {}
+
+        // =========================================================
+        // 3. REQUÊTE SQL DYNAMIQUE POUR LES STANDS
+        // =========================================================
         $sql = "SELECT s.*, 
                        CONCAT(u.firstname, ' ', u.lastname) as vendor_name, 
                        u.is_premium,
@@ -34,9 +61,11 @@ class StandController extends Controller {
             $sql .= " AND (s.city LIKE :location OR s.address LIKE :location)";
             $params[':location'] = '%' . $location . '%';
         }
-        if (!empty($category)) {
-            $sql .= " AND s.category = :category";
+        if ($category > 0) {
+            // Logique Amazon : Recherche dans la catégorie OU dans ses sous-catégories
+            $sql .= " AND (s.category = :category OR s.category IN (SELECT id FROM categories WHERE parent_id = :category_parent))";
             $params[':category'] = $category;
+            $params[':category_parent'] = $category;
         }
 
         $sql .= " ORDER BY u.is_premium DESC, s.created_at DESC"; 
@@ -51,12 +80,14 @@ class StandController extends Controller {
 
         $totalStands = count($stands);
 
+        // Envoi de toutes les données à la Vue
         echo $this->render('index', [
-            'stands'      => $stands,
-            'totalStands' => $totalStands,
-            'search'      => $search,
-            'location'    => $location,
-            'category'    => $category
+            'stands'         => $stands,
+            'totalStands'    => $totalStands,
+            'searchQuery'    => $search,
+            'searchLocation' => $location,
+            'searchCategory' => $category,
+            'categoriesTree' => $categoriesTree
         ]);
     }
 
@@ -75,7 +106,7 @@ class StandController extends Controller {
         $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
         try {
-            // 1. Récupération du Stand (avec la bonne concaténation du nom)
+            // 1. Récupération du Stand
             $stmt = $db->prepare("SELECT s.*, CONCAT(u.firstname, ' ', u.lastname) as vendor_name, u.phone as vendor_phone, u.is_premium 
                                   FROM stands s 
                                   LEFT JOIN users u ON s.user_id = u.id 
@@ -92,7 +123,7 @@ class StandController extends Controller {
                 return;
             }
 
-            // 2. Récupération des annonces du vendeur (liées par le user_id)
+            // 2. Récupération des annonces du vendeur
             $stmtListings = $db->prepare("SELECT * FROM listings WHERE user_id = :user_id AND LOWER(status) = 'active' ORDER BY created_at DESC");
             $stmtListings->execute([':user_id' => $stand['user_id']]);
             $listings = $stmtListings->fetchAll(\PDO::FETCH_ASSOC);
@@ -104,7 +135,6 @@ class StandController extends Controller {
             ]);
 
         } catch (\PDOException $e) {
-            // Si une colonne manque, l'erreur s'affichera clairement !
             die("<div style='background:#111; color:white; padding:20px; border-left:8px solid red; font-family:sans-serif;'>
                     <h3 style='color:red;'>🚨 ERREUR SQL DANS DETAIL()</h3>
                     <p>" . $e->getMessage() . "</p>
@@ -127,7 +157,28 @@ class StandController extends Controller {
         $stmt->execute([$userId]);
         $existingStand = $stmt->fetch(\PDO::FETCH_ASSOC);
 
-        echo $this->render('create', ['existingStand' => $existingStand]);
+        // NOUVEAU : Chargement de l'arbre des catégories pour le formulaire de création
+        $categoriesTree = [];
+        try {
+            $stmtCats = $db->query("SELECT id, name_key AS name, parent_id FROM categories ORDER BY name_key ASC");
+            $allCats = $stmtCats->fetchAll(\PDO::FETCH_ASSOC);
+            foreach($allCats as $cat) {
+                if (empty($cat['parent_id'])) {
+                    $categoriesTree[$cat['id']] = ['id' => $cat['id'], 'name' => $cat['name'], 'subcategories' => []];
+                }
+            }
+            foreach($allCats as $cat) {
+                if (!empty($cat['parent_id']) && isset($categoriesTree[$cat['parent_id']])) {
+                    $categoriesTree[$cat['parent_id']]['subcategories'][] = $cat;
+                }
+            }
+            usort($categoriesTree, function($a, $b) { return strcmp($a['name'], $b['name']); });
+        } catch (\PDOException $e) {}
+
+        echo $this->render('create', [
+            'existingStand'  => $existingStand,
+            'categoriesTree' => $categoriesTree // On envoie l'arbre à la page visuelle
+        ]);
     }
 
     public function store() {

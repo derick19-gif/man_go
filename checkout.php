@@ -8,6 +8,7 @@ require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/core/Autoloader.php';
 require_once __DIR__ . '/core/Database.php';
 require_once __DIR__ . '/core/WalletManager.php'; // Inclusion du WalletManager
+require_once __DIR__ . '/core/Settings.php';
 
 if (defined('SESSION_NAME')) session_name(SESSION_NAME);
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -30,11 +31,11 @@ $selectedPlan = $_GET['plan'] ?? 'premium';
 
 if ($selectedPlan === 'starter') {
     $planName = "Starter Pro";
-    $planPrice = 2500;
+    $planPrice = (int)\App\Core\Settings::get('starter_price', 2500); // LECTURE DYNAMIQUE
     $planDbId = 3; 
 } else {
     $planName = "Premium VIP";
-    $planPrice = 5000;
+    $planPrice = (int)\App\Core\Settings::get('premium_price', 5000); // LECTURE DYNAMIQUE
     $planDbId = 2; 
 }
 
@@ -91,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmtUser->execute([$userId]);
             $currentUser = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-            $commissionRate = defined('REFERRAL_COMMISSION_PERCENT') ? (int)REFERRAL_COMMISSION_PERCENT : 20;
+            $commissionRate = (int)\App\Core\Settings::get('referral_commission_percent', 20); // LECTURE DYNAMIQUE
 
             if (!empty($currentUser['referred_by']) && $commissionRate > 0) {
                 $referrerId = (int)$currentUser['referred_by'];

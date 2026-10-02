@@ -9,11 +9,6 @@ if (file_exists($countriesPath) && !class_exists('Countries')) {
     require_once $countriesPath;
 }
 
-$professionsPath = dirname(dirname(dirname(__DIR__))) . '/core/Professions.php';
-if (file_exists($professionsPath) && !class_exists('Professions')) {
-    require_once $professionsPath;
-}
-
 $headerPath = dirname(dirname(dirname(__DIR__))) . '/themes/default/templates/layouts/header.php';
 if (!file_exists($headerPath)) {
     $headerPath = dirname(dirname(dirname(__DIR__))) . '/app/views/layouts/header.php';
@@ -135,6 +130,13 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
                 <div>
                     <h3 class="text-amber-400 text-xs font-black uppercase tracking-wider mb-4 flex items-center gap-2">
                         <i class="fa-solid fa-image"></i> Logo ou Photo Professionnelle <span class="text-red-500 ml-1">*</span>
+                        <!-- INFO BULLE -->
+                        <div class="group relative inline-block ml-1">
+                            <i class="fa-solid fa-circle-info text-slate-500 hover:text-amber-400 cursor-help transition"></i>
+                            <div class="opacity-0 w-56 bg-slate-800 text-white text-[10px] font-normal normal-case tracking-normal rounded-lg py-2 px-3 absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none group-hover:opacity-100 transition-opacity duration-300 shadow-xl border border-slate-700">
+                                Une image claire rassure les clients. Utilisez le logo de votre entreprise ou une photo professionnelle de vous.
+                            </div>
+                        </div>
                     </h3>
                     <div class="bg-slate-950 border border-slate-700 rounded-2xl p-4 flex items-center gap-6">
                         <img id="logoPreview" src="<?= $logoDisplayUrl ?>" class="w-20 h-20 rounded-xl object-cover border-2 border-slate-800 shadow-lg">
@@ -151,23 +153,36 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label class="block text-xs font-bold text-slate-300 uppercase mb-2">Nom du Stand / Nom Pro *</label>
+                            <label class="flex items-center text-xs font-bold text-slate-300 uppercase mb-2">
+                                Nom du Stand / Nom Pro *
+                                <!-- INFO BULLE -->
+                                <div class="group relative inline-block ml-2">
+                                    <i class="fa-solid fa-circle-info text-slate-500 hover:text-amber-400 cursor-help transition"></i>
+                                    <div class="opacity-0 w-64 bg-slate-800 text-white text-[10px] font-normal normal-case tracking-normal rounded-lg py-2 px-3 absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none group-hover:opacity-100 transition-opacity duration-300 shadow-xl border border-slate-700 text-center">
+                                        C'est le nom officiel qui s'affichera sur votre vitrine et sur toutes vos futures annonces.
+                                    </div>
+                                </div>
+                            </label>
                             <input type="text" name="name" id="f_name" required placeholder="Ex: Cabinet Notarial / Rikos Services" 
                                 value="<?= htmlspecialchars($existingStand['name'] ?? '') ?>" 
                                 <?= $isEditMode ? 'readonly class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3.5 text-sm font-medium text-slate-500 cursor-not-allowed"' : 'class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition"' ?>>
                         </div>
+                        
                         <div>
                             <label class="block text-xs font-bold text-slate-300 uppercase mb-2">Métier / Domaine *</label>
                             <select name="category" id="f_category" required 
                                 <?= $isEditMode ? 'disabled class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3.5 text-sm font-medium text-slate-500 cursor-not-allowed appearance-none"' : 'class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-sm font-medium text-white focus:outline-none focus:border-amber-500 transition"' ?>>
-                                <?php if ($isEditMode): ?>
-                                    <option value="<?= htmlspecialchars($existingStand['category']) ?>" selected><?= htmlspecialchars($existingStand['category']) ?></option>
-                                <?php else: ?>
-                                    <option value="" class="bg-slate-900 text-slate-400">Sélectionnez votre métier</option>
-                                    <?php 
-                                    if (class_exists('Professions')) echo Professions::renderOptions();
-                                    else echo '<option value="Artisan">Artisan</option><option value="Commerçant">Commerçant</option>';
-                                    ?>
+                                <option value="" class="bg-slate-900 text-slate-400">Sélectionnez votre métier</option>
+                                <?php if (!empty($categoriesTree)): ?>
+                                    <?php foreach ($categoriesTree as $parent): ?>
+                                        <optgroup label="■ <?= htmlspecialchars($parent['name']) ?>">
+                                            <?php foreach ($parent['subcategories'] as $sub): ?>
+                                                <option value="<?= $sub['id'] ?>" <?= (($existingStand['category'] ?? '') == $sub['id']) ? 'selected' : '' ?>>
+                                                    <?= htmlspecialchars($sub['name']) ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </optgroup>
+                                    <?php endforeach; ?>
                                 <?php endif; ?>
                             </select>
                             <?php if ($isEditMode) echo '<input type="hidden" name="category" value="'.htmlspecialchars($existingStand['category']).'">'; ?>
@@ -193,12 +208,21 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
                                 class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition">
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-300 uppercase mb-2">Zone *</label>
+                            <label class="flex items-center text-xs font-bold text-slate-300 uppercase mb-2">
+                                Zone d'intervention / Livraison *
+                                <!-- INFO BULLE -->
+                                <div class="group relative inline-block ml-2">
+                                    <i class="fa-solid fa-circle-info text-slate-500 hover:text-amber-400 cursor-help transition"></i>
+                                    <div class="opacity-0 w-64 bg-slate-800 text-white text-[10px] font-normal normal-case tracking-normal rounded-lg py-2 px-3 absolute z-10 bottom-full right-0 md:left-1/2 md:-translate-x-1/2 mb-2 pointer-events-none group-hover:opacity-100 transition-opacity duration-300 shadow-xl border border-slate-700 text-center">
+                                        Définissez votre capacité à servir vos clients : uniquement dans votre ville (Local), dans tout le pays (National), ou partout dans le monde (International).
+                                    </div>
+                                </div>
+                            </label>
                             <select name="coverage_zone" id="f_zone" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-sm font-medium text-white focus:outline-none focus:border-amber-500 transition">
                                 <?php $zone = $existingStand['address'] ?? ''; ?>
-                                <option value="Local" <?= $zone == 'Local' ? 'selected' : '' ?>>Local</option>
-                                <option value="National" <?= $zone == 'National' ? 'selected' : '' ?>>National</option>
-                                <option value="International" <?= $zone == 'International' ? 'selected' : '' ?>>International</option>
+                                <option value="Local" <?= $zone == 'Local' ? 'selected' : '' ?>>Local (Ma ville uniquement)</option>
+                                <option value="National" <?= $zone == 'National' ? 'selected' : '' ?>>National (Tout le pays)</option>
+                                <option value="International" <?= $zone == 'International' ? 'selected' : '' ?>>International (Monde entier)</option>
                             </select>
                         </div>
                     </div>
@@ -210,7 +234,16 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
                     </h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <div>
-                            <label class="block text-xs font-bold text-slate-300 uppercase mb-2">Téléphone Pro *</label>
+                            <label class="flex items-center text-xs font-bold text-slate-300 uppercase mb-2">
+                                Téléphone Pro *
+                                <!-- INFO BULLE -->
+                                <div class="group relative inline-block ml-2">
+                                    <i class="fa-solid fa-circle-info text-slate-500 hover:text-amber-400 cursor-help transition"></i>
+                                    <div class="opacity-0 w-56 bg-slate-800 text-white text-[10px] font-normal normal-case tracking-normal rounded-lg py-2 px-3 absolute z-10 bottom-full left-1/2 -translate-x-1/2 mb-2 pointer-events-none group-hover:opacity-100 transition-opacity duration-300 shadow-xl border border-slate-700 text-center">
+                                        Ce numéro sera visible publiquement par vos futurs clients. Mettez de préférence un numéro WhatsApp.
+                                    </div>
+                                </div>
+                            </label>
                             <input type="tel" name="phone" id="f_phone" inputmode="tel" required placeholder="Ex: +228 90 00 00 00" maxlength="20"
                                 oninput="this.value = this.value.replace(/[^0-9+\-\s]/g, '')"
                                 value="<?= htmlspecialchars($existingStand['phone'] ?? '') ?>"
@@ -225,7 +258,7 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
                     </div>
                     <div>
                         <label class="block text-xs font-bold text-slate-300 uppercase mb-2">Description *</label>
-                        <textarea name="description" rows="4" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition"><?= htmlspecialchars($existingStand['description'] ?? '') ?></textarea>
+                        <textarea name="description" rows="4" required class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3.5 text-sm font-medium text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition" placeholder="Présentez votre entreprise, vos services, ou votre philosophie..."><?= htmlspecialchars($existingStand['description'] ?? '') ?></textarea>
                     </div>
                 </div>
 
@@ -293,17 +326,14 @@ const isEditMode = <?= $isEditMode ? 'true' : 'false' ?>;
 function handleFormSubmit() {
     const form = document.getElementById('standForm');
     
-    // Vérification HTML5 basique
     if (!form.checkValidity()) {
         form.reportValidity();
         return;
     }
 
     if (isEditMode) {
-        // En mode édition, on soumet direct
         form.submit();
     } else {
-        // En mode création, on affiche le Modal de résumé
         document.getElementById('sum_name').innerText = document.getElementById('f_name').value;
         const catSelect = document.getElementById('f_category');
         document.getElementById('sum_category').innerText = catSelect.options[catSelect.selectedIndex].text;
@@ -316,7 +346,6 @@ function handleFormSubmit() {
         const modalContent = document.getElementById('summaryModalContent');
         
         modal.classList.remove('hidden');
-        // Petit délai pour l'animation CSS
         setTimeout(() => {
             modal.classList.remove('opacity-0');
             modalContent.classList.remove('scale-95');
@@ -337,7 +366,6 @@ function closeModal() {
 }
 
 function submitFinalForm() {
-    // Désactiver le bouton pour éviter les doubles clics
     event.currentTarget.disabled = true;
     event.currentTarget.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Création...';
     document.getElementById('standForm').submit();
@@ -381,8 +409,7 @@ function detectLocation() {
 
 <?php
 $footerPath = dirname(dirname(dirname(__DIR__))) . '/themes/default/templates/layouts/footer.php';
-if (!file_exists($footerPath)) {
-    $footerPath = dirname(dirname(dirname(__DIR__))) . '/app/views/layouts/footer.php';
+if (!file_exists($footerPath)) {$footerPath = dirname(dirname(dirname(__DIR__))) . '/app/views/layouts/footer.php';
 }
 if (file_exists($footerPath)) {
     require_once $footerPath;

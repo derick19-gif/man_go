@@ -218,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ?>
                 <a href="<?= $baseUrl ?>/listing-detail.php?id=<?= (int)($item['id'] ?? 0) ?>" class="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col group transform hover:-translate-y-2">
                     <div class="relative h-48 bg-slate-100 overflow-hidden">
-                        <img src="<?= htmlspecialchars($imageSrc, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'] ?? '', ENT_QUOTES, 'UTF-8') ?>" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
+                        <img src="<?= htmlspecialchars($imageSrc, ENT_QUOTES, 'UTF-8') ?>" alt="<?= htmlspecialchars($item['title'] ?? '', ENT_QUOTES, 'UTF-8') ?>" class="w-full h-full object-contain bg-slate-50 p-4 group-hover:scale-110 transition duration-500">
                         <?php if (!empty($item['category_name'])): ?>
                             <span class="absolute top-4 left-4 bg-slate-950/80 backdrop-blur-md text-white text-xs font-black uppercase tracking-wider px-4 py-1.5 rounded-full shadow-lg">
                                 <?= htmlspecialchars($item['category_name'], ENT_QUOTES, 'UTF-8') ?>

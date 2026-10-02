@@ -25,8 +25,7 @@ if (empty($_SESSION['user_id'])) {
 
 // 2. Sécurité : Si l'utilisateur est connecté mais n'est PAS un vendeur
 $userRole = $_SESSION['user_role'] ?? '';
-if (!in_array($userRole, ['vendor', 'vendeur', '4'])) { // J'ajoute '4' au cas où vous utiliseriez des ID pour les rôles
-    // Redirige vers le tableau de bord client avec un message d'erreur
+if (!in_array($userRole, ['vendor', 'vendeur', '4'])) {
     header("Location: $baseUrl/client/views/dashboard.php?error=not_vendor");
     exit();
 }
@@ -36,8 +35,34 @@ $db = \App\Core\Database::connect();
 $successMessage = ""; $errorMessage = "";
 
 // Vérification du statut Premium du vendeur
-$stmtUser =$db->prepare("SELECT is_premium FROM users WHERE id = :id");
-$stmtUser->execute([':id' => $_SESSION['user_id']]);$userObj = $stmtUser->fetch(PDO::FETCH_ASSOC);$isPremium = !empty($userObj['is_premium']) ? (bool)$userObj['is_premium'] : false;
+$stmtUser = $db->prepare("SELECT is_premium FROM users WHERE id = :id");
+$stmtUser->execute([':id' => $_SESSION['user_id']]);
+$userObj = $stmtUser->fetch(PDO::FETCH_ASSOC);
+$isPremium = !empty($userObj['is_premium']) ? (bool)$userObj['is_premium'] : false;
+
+// =========================================================================
+// CHARGEMENT DE L'ARBRE DES CATÉGORIES (Depuis la BDD)
+// =========================================================================
+$categoriesTree = [];
+try {
+    $stmtCats = $db->query("SELECT id, name_key AS name, parent_id FROM categories ORDER BY name_key ASC");
+    $allCats = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
+    
+    // On isole les Familles (Parents)
+    foreach($allCats as $cat) {
+        if (empty($cat['parent_id'])) {
+            $categoriesTree[$cat['id']] = ['id' => $cat['id'], 'name' => $cat['name'], 'subcategories' => []];
+        }
+    }
+    // On rattache les Spécialités (Enfants)
+    foreach($allCats as $cat) {
+        if (!empty($cat['parent_id']) && isset($categoriesTree[$cat['parent_id']])) {
+            $categoriesTree[$cat['parent_id']]['subcategories'][] = $cat;
+        }
+    }
+    usort($categoriesTree, function($a, $b) { return strcmp($a['name'], $b['name']); });
+} catch (PDOException $e) {}
+
 
 // Mode Édition
 $editMode = false;
@@ -45,31 +70,37 @@ $listingId = $_GET['id'] ?? $_POST['listing_id'] ?? null;
 $existingData = [];
 
 if ($listingId) {
-    $stmtEdit =$db->prepare("SELECT * FROM listings WHERE id = :id AND user_id = :uid LIMIT 1");
-    $stmtEdit->execute([':id' => $listingId, ':uid' =>$_SESSION['user_id']]);
-    $existingData =$stmtEdit->fetch(PDO::FETCH_ASSOC);
-    if ($existingData)$editMode = true;
+    $stmtEdit = $db->prepare("SELECT * FROM listings WHERE id = :id AND user_id = :uid LIMIT 1");
+    $stmtEdit->execute([':id' => $listingId, ':uid' => $_SESSION['user_id']]);
+    $existingData = $stmtEdit->fetch(PDO::FETCH_ASSOC);
+    if ($existingData) $editMode = true;
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        $stmtStand =$db->prepare("SELECT id FROM stands WHERE user_id = :user_id AND status = 'active' LIMIT 1");
-        $stmtStand->execute([':user_id' =>$_SESSION['user_id']]);
-        $stand =$stmtStand->fetch(PDO::FETCH_ASSOC);
+        $stmtStand = $db->prepare("SELECT id FROM stands WHERE user_id = :user_id AND status = 'active' LIMIT 1");
+        $stmtStand->execute([':user_id' => $_SESSION['user_id']]);
+        $stand = $stmtStand->fetch(PDO::FETCH_ASSOC);
         
-        if (!$stand) {$errorMessage = "Opération refusée : Vous devez d'abord créer et activer votre Stand Officiel.";
+        if (!$stand) {
+            $errorMessage = "Opération refusée : Vous devez d'abord créer et activer votre Stand Officiel.";
         } else {
-            $standId = $stand['id'];$title = trim($_POST['title'] ?? '');$categoryId = intval($_POST['category_id'] ?? 0);$price = floatval($_POST['price'] ?? 0);$originalPrice = !empty($_POST['original_price']) ? floatval($_POST['original_price']) : null;
+            $standId = $stand['id'];
+            $title = trim($_POST['title'] ?? '');
+            $categoryId = intval($_POST['category_id'] ?? 0);
+            $price = floatval($_POST['price'] ?? 0);
+            $originalPrice = !empty($_POST['original_price']) ? floatval($_POST['original_price']) : null;
             $description = trim($_POST['description'] ?? '');
             $webLink = trim($_POST['web_link'] ?? '');
             $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-',$title), '-'));
 
             // LOGIQUE DE PROGRAMMATION PREMIUM
             $scheduledAt = null;
-            $status = 'active'; // Par défaut
+            $status = 'active'; 
             if ($isPremium && !empty($_POST['scheduled_at'])) {
-                $scheduledAt =$_POST['scheduled_at'];
-                if (strtotime($scheduledAt) > time()) {$status = 'scheduled'; // Annonce en attente de sa date
+                $scheduledAt = $_POST['scheduled_at'];
+                if (strtotime($scheduledAt) > time()) {
+                    $status = 'scheduled'; 
                 }
             }
 
@@ -77,10 +108,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mainImagePath = $editMode ? $existingData['image_path'] : null;
             $uploadedImages = [];
             
-            if (!empty($_FILES['images']['name'][0])) {$uploadDir = __DIR__ . '/public/uploads/listings/';
+            if (!empty($_FILES['images']['name'][0])) {
+                $uploadDir = __DIR__ . '/public/uploads/listings/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
                 
-                foreach ($_FILES['images']['name'] as $key =>$name) {
+                foreach ($_FILES['images']['name'] as $key => $name) {
                     if ($_FILES['images']['error'][$key] === UPLOAD_ERR_OK) {
                         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
                         if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) {
@@ -143,6 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <title><?= $editMode ? 'Modifier' : 'Publier' ?> une annonce - MAN GO</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Choices.css -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
     <style>
@@ -169,6 +202,11 @@ if (file_exists($headerPath)) require_once$headerPath;
             <i class="fa-solid fa-circle-check text-xl mr-3"></i> <?= $successMessage ?>
         </div>
     <?php endif; ?>
+    <?php if (!empty($errorMessage)): ?>
+        <div class="mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl text-sm font-bold flex items-center shadow-sm">
+            <i class="fa-solid fa-triangle-exclamation text-xl mr-3"></i> <?= $errorMessage ?>
+        </div>
+    <?php endif; ?>
 
     <form action="publish.php" method="POST" enctype="multipart/form-data" class="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6">
         <?php if($editMode): ?><input type="hidden" name="listing_id" value="<?= $listingId ?>"><?php endif; ?>
@@ -179,31 +217,24 @@ if (file_exists($headerPath)) require_once$headerPath;
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            
+            <!-- SÉLECTEUR DE CATÉGORIES DYNAMIQUE AVEC CHOICES.JS -->
             <div>
                 <label class="block text-xs font-bold text-slate-700 uppercase mb-2">Catégorie *</label>
                 <select name="category_id" id="category_id" required>
-                    <option value="">Sélectionnez ou tapez une catégorie</option>
-                    <option value="1" <?= (($existingData['category_id']??0) == 1) ? 'selected' : '' ?>>Accessoires, Bijoux & Montres</option>
-                    <option value="2" <?= (($existingData['category_id']??0) == 2) ? 'selected' : '' ?>>Alimentation & Supermarché</option>
-                    <option value="3" <?= (($existingData['category_id']??0) == 3) ? 'selected' : '' ?>>Animaux & Accessoires</option>
-                    <option value="4" <?= (($existingData['category_id']??0) == 4) ? 'selected' : '' ?>>Art & Artisanat</option>
-                    <option value="5" <?= (($existingData['category_id']??0) == 5) ? 'selected' : '' ?>>Automobile & Motos (Pièces)</option>
-                    <option value="6" <?= (($existingData['category_id']??0) == 6) ? 'selected' : '' ?>>Beauté, Cosmétiques & Parfums</option>
-                    <option value="7" <?= (($existingData['category_id']??0) == 7) ? 'selected' : '' ?>>Bébé & Puériculture</option>
-                    <option value="8" <?= (($existingData['category_id']??0) == 8) ? 'selected' : '' ?>>Bricolage & Jardinage</option>
-                    <option value="9" <?= (($existingData['category_id']??0) == 9) ? 'selected' : '' ?>>Électroménager</option>
-                    <option value="10" <?= (($existingData['category_id']??0) == 10) ? 'selected' : '' ?>>Électronique, High-Tech & Téléphones</option>
-                    <option value="11" <?= (($existingData['category_id']??0) == 11) ? 'selected' : '' ?>>Fournitures de Bureau & Scolaire</option>
-                    <option value="12" <?= (($existingData['category_id']??0) == 12) ? 'selected' : '' ?>>Immobilier, Terrains & Logements</option>
-                    <option value="13" <?= (($existingData['category_id']??0) == 13) ? 'selected' : '' ?>>Jeux, Jouets & Consoles</option>
-                    <option value="14" <?= (($existingData['category_id']??0) == 14) ? 'selected' : '' ?>>Livres, Musique & Films</option>
-                    <option value="15" <?= (($existingData['category_id']??0) == 15) ? 'selected' : '' ?>>Maison, Meubles & Décoration</option>
-                    <option value="16" <?= (($existingData['category_id']??0) == 16) ? 'selected' : '' ?>>Mode, Vêtements & Chaussures</option>
-                    <option value="17" <?= (($existingData['category_id']??0) == 17) ? 'selected' : '' ?>>Sports & Matériel de loisirs</option>
-                    <option value="18" <?= (($existingData['category_id']??0) == 18) ? 'selected' : '' ?>>Véhicules (Autos, Motos, Vélos)</option>
-                    <option value="99" <?= (($existingData['category_id']??0) == 99) ? 'selected' : '' ?>>Autres / Divers</option>
+                    <option value="">Sélectionnez une catégorie...</option>
+                    <?php foreach ($categoriesTree as$parent): ?>
+                        <optgroup label="■ <?= htmlspecialchars($parent['name']) ?>">
+                            <?php foreach ($parent['subcategories'] as$sub): ?>
+                                <option value="<?= $sub['id'] ?>" <?= (($existingData['category_id'] ?? 0) ==$sub['id']) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($parent['name']) ?> > <?= htmlspecialchars($sub['name']) ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </optgroup>
+                    <?php endforeach; ?>
                 </select>
             </div>
+
             <div>
                 <label class="block text-xs font-bold text-slate-700 uppercase mb-2">Prix de vente *</label>
                 <div class="relative">
@@ -295,9 +326,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if(categoryElement) {
             new Choices(categoryElement, {
                 searchEnabled: true,
-                searchPlaceholderValue: 'Tapez pour rechercher...',
+                searchPlaceholderValue: 'Rechercher (ex: Smartphone, Chaussure...)',
                 itemSelectText: '',
-                noResultsText: 'Aucune catégorie trouvée, choisissez "Autres"',
+                noResultsText: 'Aucune catégorie trouvée',
                 shouldSort: false
             });
         }

@@ -1,9 +1,12 @@
 <?php
-// client/views/dashboard.php
+// =========================================================================
+// client/views/dashboard.php - Espace Client
+// =========================================================================
 
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../core/Autoloader.php';
 require_once __DIR__ . '/../../core/Database.php';
+require_once __DIR__ . '/../../core/WalletManager.php'; // On inclut le gestionnaire financier
 
 Session::init();
 
@@ -28,6 +31,7 @@ $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
 try {
     $db = \App\Core\Database::connect();
 
+    // 1. Infos utilisateur
     $stmtUser = $db->prepare("SELECT id, firstname, lastname, email, avatar, created_at FROM users WHERE id = :id LIMIT 1");
     $stmtUser->execute([':id' => $userId]);
     $user = $stmtUser->fetch(PDO::FETCH_ASSOC);
@@ -41,13 +45,15 @@ try {
         exit;
     }
 
+    // 2. Infos Portefeuille (Création auto si inexistant)
+    $wallets = \App\Core\WalletManager::getWallets($db, $userId);
+    $creditsBalance = $wallets['credits_balance'];
+
+    // 3. Stats Favoris & Messagerie
     $stmtFav = $db->prepare("SELECT COUNT(*) FROM favorites WHERE user_id = :id");
     $stmtFav->execute([':id' => $userId]);
     $totalFavorites = (int)$stmtFav->fetchColumn();
 
-    // ==========================================
-    // COMPTEUR DE MESSAGES ET NON-LUS DYNAMIQUE
-    // ==========================================
     $totalMessages = 0; 
     $unreadMessages = 0; 
     try {
@@ -60,6 +66,7 @@ try {
         $unreadMessages = (int)$stmtUnread->fetchColumn();
     } catch(Exception $e) {}
 
+    // 4. Derniers favoris
     $recentFavorites = [];
     try {
         $stmtRecentFav = $db->prepare("
@@ -76,11 +83,7 @@ try {
     } catch(Exception $e) {}
 
 } catch (PDOException $e) {
-    $user = ['name' => 'Utilisateur', 'email' => '', 'avatar' => null];
-    $totalFavorites = 0;
-    $totalMessages = 0;
-    $unreadMessages = 0;
-    $recentFavorites = [];
+    die("Erreur de connexion à la base de données.");
 }
 ?>
 <!DOCTYPE html>
@@ -92,21 +95,15 @@ try {
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: { brand: { 500: '#f59e0b', 600: '#d97706', 950: '#090d16' } },
-                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
-                }
-            }
-        }
-    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    </style>
 </head>
-<body class="bg-slate-50 font-sans text-slate-800 flex h-screen overflow-hidden relative">
+<body class="bg-slate-50 text-slate-800 flex h-screen overflow-hidden relative">
 
     <div id="sidebarOverlay" onclick="toggleSidebar()" class="fixed inset-0 bg-slate-900/50 z-40 hidden lg:hidden backdrop-blur-sm transition-opacity opacity-0"></div>
 
+    <!-- SIDEBAR -->
     <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-slate-200 h-full flex flex-col p-6 transform -translate-x-full lg:translate-x-0 lg:static transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none">
         
         <div class="flex items-center justify-between mb-10">
@@ -123,24 +120,26 @@ try {
             <a href="#" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold transition-all bg-slate-900 text-white shadow-md">
                 <i class="fa-solid fa-house-user w-6 text-center mr-2 text-amber-500"></i> Vue d'ensemble
             </a>
+            
+            <a href="<?= $baseUrl ?>/my_wallet.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-emerald-50 hover:text-emerald-700 transition-all">
+                <i class="fa-solid fa-wallet w-6 text-center mr-2 text-emerald-500"></i> Mon Portefeuille
+            </a>
+
             <a href="<?= $baseUrl ?>/favorites.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all">
                 <i class="fa-solid fa-heart w-6 text-center mr-2 text-rose-400"></i> Mes Favoris
             </a>
 
-            <!-- ========================================== -->
-            <!-- BOUTON MESSAGERIE AVEC BADGE DYNAMIQUE -->
-            <!-- ========================================== -->
             <a href="<?= $baseUrl ?>/chat.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-2">
-                <i class="fa-solid fa-message w-6 text-center mr-2 text-indigo-400"></i> Ma Messagerie
+                <i class="fa-solid fa-message w-6 text-center mr-2 text-indigo-400"></i> Messagerie
                 <?php if (isset($unreadMessages) && $unreadMessages > 0): ?>
                     <span class="ml-auto bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
-                        <?= $unreadMessages ?> Nouveau<?= $unreadMessages > 1 ? 'x' : '' ?>
+                        <?= $unreadMessages ?>
                     </span>
                 <?php endif; ?>
             </a>
 
-            <a href="#" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all opacity-50 cursor-not-allowed" title="Bientôt disponible">
-                <i class="fa-solid fa-bag-shopping w-6 text-center mr-2 text-emerald-400"></i> Mes Achats
+            <a href="#" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-400 opacity-50 cursor-not-allowed" title="Bientôt disponible">
+                <i class="fa-solid fa-bag-shopping w-6 text-center mr-2"></i> Mes Achats
             </a>
             
             <hr class="border-slate-200 my-4">
@@ -151,10 +150,10 @@ try {
         </nav>
 
         <div class="mt-4 pt-4 border-t border-slate-200">
-            <a href="<?= $baseUrl ?>/" class="w-full flex items-center justify-center px-4 py-3 border-2 border-slate-900 text-slate-900 rounded-full font-bold hover:bg-slate-900 hover:text-white transition-all mb-3">
-                <i class="fa-solid fa-arrow-left mr-2"></i> Retour au site
+            <a href="<?= $baseUrl ?>/" class="w-full flex items-center justify-center px-4 py-3 border border-slate-300 text-slate-700 rounded-full font-bold hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all mb-3 text-sm">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Retour au marché
             </a>
-            <a href="<?= $baseUrl ?>/logout.php" class="w-full flex items-center justify-center px-4 py-3 border-2 border-red-100 text-red-500 rounded-full font-bold hover:bg-red-50 transition-all">
+            <a href="<?= $baseUrl ?>/logout.php" class="w-full flex items-center justify-center px-4 py-3 bg-red-50 text-red-500 rounded-full font-bold hover:bg-red-500 hover:text-white transition-all text-sm">
                 <i class="fa-solid fa-arrow-right-from-bracket mr-2"></i> Déconnexion
             </a>
         </div>
@@ -174,7 +173,7 @@ try {
 
         <main class="flex-1 overflow-y-auto p-4 sm:p-8 lg:p-10">
             
-            <header class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-10 gap-4">
+            <header class="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-8 gap-4">
                 <div class="flex items-center gap-4">
                     <img src="<?= htmlspecialchars($user['avatar'] ?? $baseUrl.'/assets/images/default-avatar.png', ENT_QUOTES, 'UTF-8') ?>" 
                          alt="Avatar" class="w-16 h-16 rounded-full border-4 border-white shadow-md object-cover">
@@ -183,10 +182,28 @@ try {
                         <p class="text-sm text-slate-500 mt-1">Prêt à dénicher de bonnes affaires aujourd'hui ?</p>
                     </div>
                 </div>
-                <a href="<?= $baseUrl ?>/listings.php" class="bg-amber-100 text-amber-700 px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm self-start sm:self-auto hover:bg-amber-200 transition">
+                <a href="<?= $baseUrl ?>/listings.php" class="bg-amber-100 text-amber-700 px-6 py-3 rounded-xl text-sm font-bold shadow-sm self-start sm:self-auto hover:bg-amber-500 hover:text-white transition-colors duration-300">
                     <i class="fa-solid fa-magnifying-glass mr-2"></i> Explorer le marché
                 </a>
             </header>
+
+            <!-- NOUVEAU : BANNIÈRE WALLET CLIENT -->
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 shadow-xl shadow-emerald-600/20 text-white flex flex-col sm:flex-row items-center justify-between mb-10 transition-transform hover:-translate-y-1">
+                <div class="flex items-center gap-5 text-center sm:text-left mb-4 sm:mb-0">
+                    <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center text-white backdrop-blur-md flex-shrink-0 border border-white/30">
+                        <i class="fa-solid fa-wallet text-2xl"></i>
+                    </div>
+                    <div>
+                        <h4 class="font-black text-xl mb-1 flex items-center gap-2">Mon Portefeuille <span class="bg-white text-emerald-700 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Actif</span></h4>
+                        <p class="text-sm text-emerald-100">Gérez vos fonds, recevez des transferts instantanés et gagnez des crédits.</p>
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <a href="<?= $baseUrl ?>/my_wallet.php" class="bg-white text-emerald-700 font-black px-6 py-3 rounded-xl hover:bg-emerald-50 transition shadow-sm whitespace-nowrap text-sm">
+                        Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i>
+                    </a>
+                </div>
+            </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
                 <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex justify-between items-center transition hover:shadow-md hover:border-rose-200 group">
@@ -233,7 +250,7 @@ try {
                             <div class="space-y-4">
                                 <?php foreach ($recentFavorites as $fav): ?>
                                     <div class="flex items-center p-3 hover:bg-slate-50 rounded-2xl transition border border-transparent hover:border-slate-100">
-                                        <img src="<?= htmlspecialchars(!empty($fav['image_path']) ? $baseUrl.'/'.$fav['image_path'] : $baseUrl.'/assets/images/placeholder.jpg') ?>" 
+                                        <img src="<?= htmlspecialchars(!empty($fav['image_path']) ? $baseUrl.'/'.$fav['image_path'] : $baseUrl.'/assets/images/placeholder.jpg', ENT_QUOTES, 'UTF-8') ?>" 
                                              class="w-20 h-20 rounded-xl object-cover mr-4 shadow-sm border border-slate-200">
                                         <div class="flex-1 min-w-0">
                                             <span class="text-[10px] font-black text-amber-500 uppercase tracking-wider"><?= htmlspecialchars($fav['category'] ?? 'Général') ?></span>
@@ -255,23 +272,24 @@ try {
                     </div>
                 </div>
 
+                <!-- CARTE DEVENIR VENDEUR -->
                 <div class="lg:col-span-1">
-                    <div class="bg-gradient-to-br from-slate-900 to-[#0f172a] rounded-3xl p-8 text-center shadow-xl relative overflow-hidden h-full flex flex-col justify-center border border-slate-800">
-                        <div class="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-amber-500 opacity-20 blur-2xl"></div>
+                    <div class="bg-gradient-to-br from-slate-900 to-[#0f172a] rounded-3xl p-8 text-center shadow-xl relative overflow-hidden h-full flex flex-col justify-center border border-slate-800 group">
+                        <div class="absolute top-0 right-0 -mr-8 -mt-8 w-32 h-32 rounded-full bg-amber-500 opacity-20 blur-2xl group-hover:bg-amber-400 transition-colors"></div>
                         <div class="absolute bottom-0 left-0 -ml-8 -mb-8 w-32 h-32 rounded-full bg-blue-500 opacity-20 blur-2xl"></div>
                         
                         <div class="relative z-10">
-                            <div class="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mx-auto mb-6 border border-white/20">
+                            <div class="w-20 h-20 bg-white/10 backdrop-blur-md rounded-full flex items-center justify-center mx-auto mb-6 border border-white/20 group-hover:scale-110 transition-transform">
                                 <i class="fa-solid fa-store text-amber-400 text-3xl"></i>
                             </div>
                             <h3 class="text-2xl font-black text-white mb-3 leading-tight">Gagnez de l'argent avec MAN GO</h3>
                             <p class="text-slate-300 text-sm mb-8 leading-relaxed">
-                                Transformez votre passion en profit. Ouvrez votre boutique professionnelle et touchez des milliers de clients aujourd'hui.
+                                Transformez votre passion en profit. Ouvrez votre boutique professionnelle et touchez des milliers de clients dès aujourd'hui.
                             </p>
-                            <a href="<?= $baseUrl ?>/become-vendor.php" class="block w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-black py-4 rounded-xl transition transform hover:-translate-y-1 shadow-[0_0_20px_rgba(245,158,11,0.3)]">
-                                Devenir Vendeur PRO
+                            <a href="<?= $baseUrl ?>/become-vendor.php" class="block w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-900 font-black py-4 rounded-xl transition transform hover:-translate-y-1 shadow-[0_0_20px_rgba(245,158,11,0.3)] text-sm">
+                                DEVENIR VENDEUR PRO
                             </a>
-                            <p class="text-slate-400 text-xs mt-4"><i class="fa-solid fa-check text-amber-500 mr-1"></i> Inscription gratuite et rapide</p>
+                            <p class="text-slate-400 text-xs mt-4 font-bold"><i class="fa-solid fa-check text-amber-500 mr-1"></i> Inscription Gratuite</p>
                         </div>
                     </div>
                 </div>

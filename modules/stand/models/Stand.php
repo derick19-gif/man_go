@@ -25,7 +25,6 @@ class Stand extends Model {
 
     public function find($id) {
         if (!$this->db) return null;
-        // CORRECTION ICI : u.name remplacé par CONCAT(u.firstname, ' ', u.lastname)
         $stmt = $this->db->prepare("SELECT s.*, CONCAT(u.firstname, ' ', u.lastname) as vendor_name, u.phone as vendor_phone, u.is_premium 
                                     FROM {$this->table} s 
                                     LEFT JOIN users u ON s.user_id = u.id 
@@ -42,12 +41,11 @@ class Stand extends Model {
     }
 
     // =========================================================================
-    // 1. LE MOTEUR DE RECHERCHE MAN GO (Pour afficher les stands sur la page publique)
+    // 1. LE MOTEUR DE RECHERCHE MAN GO (Pour les Stands)
     // =========================================================================
-    public function getActiveStands($search = '', $location = '', $category = '') {
+    public function getActiveStands($search = '', $location = '', $categoryId = 0) {
         if (!$this->db) return [];
 
-        // CORRECTION : u.is_premium (car la colonne est dans users, pas dans stands)
         $sql = "SELECT s.*, CONCAT(u.firstname, ' ', u.lastname) as vendor_name, u.is_premium 
                 FROM {$this->table} s 
                 LEFT JOIN users u ON s.user_id = u.id 
@@ -55,25 +53,24 @@ class Stand extends Model {
         
         $params = [];
 
-        // Filtre par mot-clé (Nom ou Description)
         if (!empty($search)) {
             $sql .= " AND (s.name LIKE :search OR s.description LIKE :search)";
-            $params[':search'] = '%' . $search . '%';
+            $params[':search'] = '%' . trim($search) . '%';
         }
 
-        // Filtre par localisation (Ville ou Quartier)
         if (!empty($location)) {
             $sql .= " AND (s.city LIKE :location OR s.address LIKE :location)";
-            $params[':location'] = '%' . $location . '%';
+            $params[':location'] = '%' . trim($location) . '%';
         }
 
-        // Filtre par Catégorie/Métier
-        if (!empty($category)) {
-            $sql .= " AND s.category = :category";
-            $params[':category'] = $category;
+        // L'ASTUCE PARENT/ENFANT APPLIQUÉE AUX STANDS
+        if ($categoryId > 0) {
+            // On vérifie si la catégorie correspond, OU si c'est un enfant de cette catégorie
+            $sql .= " AND (s.category = :cat_id OR s.category IN (SELECT id FROM categories WHERE parent_id = :cat_id_parent))";
+            $params[':cat_id'] = $categoryId;
+            $params[':cat_id_parent'] = $categoryId;
         }
 
-        // L'ASTUCE BUSINESS : On trie d'abord par Compte Premium (u.is_premium DESC)
         $sql .= " ORDER BY u.is_premium DESC, s.created_at DESC"; 
 
         try {
@@ -81,19 +78,16 @@ class Stand extends Model {
             $stmt->execute($params);
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
-            // COMMANDE ANTI-DEVINETTES : Si le SQL échoue, l'exécution s'arrête et affiche l'erreur exacte !
-            die("<div style='background:red; color:white; padding:20px; font-weight:bold;'>ERREUR SQL EXACTE : " . $e->getMessage() . "</div>");
+            die("<div style='background:red; color:white; padding:20px; font-weight:bold;'>ERREUR SQL STANDS : " . $e->getMessage() . "</div>");
         }
     }
-
     // =========================================================================
-    // 2. LA CRÉATION DE STAND (Avec détection d'erreurs)
+    // 2. LA CRÉATION DE STAND
     // =========================================================================
     public function createStand($data) {
         if (!$this->db) return false;
         
         try {
-            // Mode STRICT pour afficher les erreurs si la base de données bloque
             $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
             $sql = "INSERT INTO {$this->table} 
@@ -116,12 +110,10 @@ class Stand extends Model {
             ]);
 
         } catch (\PDOException $e) {
-            die("<div style='background:#111; color:white; padding:20px; font-family:sans-serif; border-left: 8px solid #F59E0B;'>
+            die("<div style='background:#111; color:white; padding:20px; border-left: 8px solid #F59E0B;'>
                     <h2 style='color:#EF4444;'>🚨 ERREUR BASE DE DONNÉES 🚨</h2>
-                    <p>Le formulaire est bon, mais la base de données bloque l'enregistrement pour cette raison exacte :</p>
-                    <pre style='background:#000; color:#10B981; padding:20px; font-size:16px; overflow:auto;'>".$e->getMessage()."</pre>
+                    <pre style='background:#000; color:#10B981; padding:20px; font-size:16px;'>".$e->getMessage()."</pre>
                  </div>");
         }
     }
 }
-
