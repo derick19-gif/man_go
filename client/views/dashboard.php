@@ -6,7 +6,7 @@
 require_once __DIR__ . '/../../config/config.php';
 require_once __DIR__ . '/../../core/Autoloader.php';
 require_once __DIR__ . '/../../core/Database.php';
-require_once __DIR__ . '/../../core/WalletManager.php'; // On inclut le gestionnaire financier
+require_once __DIR__ . '/../../core/WalletManager.php'; 
 
 Session::init();
 
@@ -45,7 +45,7 @@ try {
         exit;
     }
 
-    // 2. Infos Portefeuille (Création auto si inexistant)
+    // 2. Infos Portefeuille
     $wallets = \App\Core\WalletManager::getWallets($db, $userId);
     $creditsBalance = $wallets['credits_balance'];
 
@@ -129,7 +129,7 @@ try {
                 <i class="fa-solid fa-heart w-6 text-center mr-2 text-rose-400"></i> Mes Favoris
             </a>
 
-            <a href="<?= $baseUrl ?>/chat.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-2">
+            <a href="<?= $baseUrl ?>/chat.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-2 relative group">
                 <i class="fa-solid fa-message w-6 text-center mr-2 text-indigo-400"></i> Messagerie
                 <?php if (isset($unreadMessages) && $unreadMessages > 0): ?>
                     <span class="ml-auto bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm">
@@ -138,14 +138,22 @@ try {
                 <?php endif; ?>
             </a>
 
-            <a href="#" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-400 opacity-50 cursor-not-allowed" title="Bientôt disponible">
-                <i class="fa-solid fa-bag-shopping w-6 text-center mr-2"></i> Mes Achats
-            </a>
+            <div class="relative group mt-2">
+                <a href="#" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-400 opacity-50 cursor-not-allowed transition-all">
+                    <i class="fa-solid fa-bag-shopping w-6 text-center mr-2"></i> Mes Achats
+                    <i class="fa-solid fa-lock ml-auto text-xs"></i>
+                </a>
+                <!-- INFOBULLE ACHATS -->
+                <div class="opacity-0 w-48 bg-slate-800 text-white text-[10px] font-normal rounded-lg py-2 px-3 absolute z-10 top-1/2 left-full -translate-y-1/2 ml-2 pointer-events-none group-hover:opacity-100 transition-opacity duration-300 shadow-xl border border-slate-700">
+                    Ce module sera bientôt activé. Vous pourrez y suivre vos commandes et télécharger vos reçus.
+                </div>
+            </div>
             
             <hr class="border-slate-200 my-4">
 
-            <a href="<?= $baseUrl ?>/profile-settings.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-auto">
-                <i class="fa-solid fa-user-gear w-6 text-center mr-2"></i> Paramètres
+            <!-- CORRECTION DU LIEN PARAMÈTRES (PROFILE.PHP) -->
+            <a href="<?= $baseUrl ?>/profile.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-auto">
+                <i class="fa-solid fa-user-gear w-6 text-center mr-2 text-slate-400"></i> Paramètres
             </a>
         </nav>
 
@@ -187,26 +195,40 @@ try {
                 </a>
             </header>
 
-            <!-- NOUVEAU : BANNIÈRE WALLET CLIENT -->
-            <div class="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 shadow-xl shadow-emerald-600/20 text-white flex flex-col sm:flex-row items-center justify-between mb-10 transition-transform hover:-translate-y-1">
+            <!-- BANNIÈRE WALLET CLIENT AVEC INFOBULLE -->
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-700 rounded-3xl p-6 shadow-xl shadow-emerald-600/20 text-white flex flex-col sm:flex-row items-center justify-between mb-10 transition-transform hover:-translate-y-1 relative group">
                 <div class="flex items-center gap-5 text-center sm:text-left mb-4 sm:mb-0">
                     <div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center text-white backdrop-blur-md flex-shrink-0 border border-white/30">
                         <i class="fa-solid fa-wallet text-2xl"></i>
                     </div>
                     <div>
-                        <h4 class="font-black text-xl mb-1 flex items-center gap-2">Mon Portefeuille <span class="bg-white text-emerald-700 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Actif</span></h4>
-                        <p class="text-sm text-emerald-100">Gérez vos fonds, recevez des transferts instantanés et gagnez des crédits.</p>
+                        <h4 class="font-black text-xl mb-1 flex items-center gap-2">
+                            Mon Portefeuille 
+                            <span class="bg-white text-emerald-700 text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider">Actif</span>
+                        </h4>
+                        <p class="text-sm text-emerald-100">Gérez vos fonds, recevez des transferts et payez facilement.</p>
                     </div>
                 </div>
+                
+                <!-- INFOBULLE PORTEFEUILLE (Apparaît au survol de la bannière) -->
+                <div class="opacity-0 absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-slate-900 text-white text-xs font-medium py-2 px-4 rounded-xl pointer-events-none transition-opacity duration-300 shadow-xl group-hover:opacity-100 z-10 w-64 text-center border border-slate-700">
+                    Votre portefeuille sécurisé vous permettra bientôt de payer vos achats en un clic sur la plateforme !
+                </div>
+
                 <div class="flex gap-3">
-                    <a href="<?= $baseUrl ?>/my_wallet.php" class="bg-white text-emerald-700 font-black px-6 py-3 rounded-xl hover:bg-emerald-50 transition shadow-sm whitespace-nowrap text-sm">
-                        Ouvrir <i class="fa-solid fa-arrow-right ml-1"></i>
+                    <a href="<?= $baseUrl ?>/my_wallet.php" class="bg-white text-emerald-700 font-black px-6 py-3 rounded-xl hover:bg-emerald-50 transition shadow-sm whitespace-nowrap text-sm flex items-center">
+                        Ouvrir <i class="fa-solid fa-arrow-right ml-2"></i>
                     </a>
                 </div>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
-                <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex justify-between items-center transition hover:shadow-md hover:border-rose-200 group">
+                <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex justify-between items-center transition hover:shadow-md hover:border-rose-200 group relative">
+                    <!-- INFOBULLE FAVORIS -->
+                    <div class="opacity-0 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white text-[10px] font-normal py-1.5 px-3 rounded-lg pointer-events-none transition-opacity duration-300 group-hover:opacity-100 whitespace-nowrap">
+                        Vos annonces sauvegardées
+                    </div>
+                    
                     <div>
                         <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Mes Favoris</p>
                         <h3 class="text-4xl font-black text-slate-900"><?= $totalFavorites ?></h3>
@@ -217,7 +239,12 @@ try {
                     </div>
                 </div>
 
-                <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex justify-between items-center transition hover:shadow-md hover:border-indigo-200 group">
+                <div class="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm flex justify-between items-center transition hover:shadow-md hover:border-indigo-200 group relative">
+                    <!-- INFOBULLE MESSAGERIE -->
+                    <div class="opacity-0 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white text-[10px] font-normal py-1.5 px-3 rounded-lg pointer-events-none transition-opacity duration-300 group-hover:opacity-100 whitespace-nowrap">
+                        Discutez avec les vendeurs
+                    </div>
+
                     <div>
                         <p class="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Discussions actives</p>
                         <h3 class="text-4xl font-black text-slate-900"><?= $totalMessages ?></h3>
