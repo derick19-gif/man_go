@@ -54,7 +54,7 @@ if ($vendor_id !== null) {
         .inbox-sidebar { border-right: 1px solid #e2e8f0; height: 100%; display: flex; flex-direction: column; background: #fff; }
         .inbox-header { padding: 20px; background-color: #fff; border-bottom: 1px solid #f1f5f9; }
         .inbox-list { flex: 1; overflow-y: auto; }
-        .conversation-item { padding: 16px 20px; border-bottom: 1px solid #f8fafc; cursor: pointer; transition: background 0.2s; }
+        .conversation-item { padding: 16px 20px; border-bottom: 1px solid #f8fafc; cursor: pointer; transition: background 0.2s; position: relative; }
         .conversation-item:hover { background-color: #f8fafc; }
         .conversation-item.active { background-color: #fffbeb; border-left: 4px solid var(--mango-orange); }
         .avatar-circle { width: 48px; height: 48px; border-radius: 50%; background-color: var(--mango-dark); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; }
@@ -67,9 +67,7 @@ if ($vendor_id !== null) {
         .message-time { font-size: 0.7rem; margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
         .message-sent .message-time { color: rgba(255,255,255,0.7); }
         .message-received .message-time { color: #64748b; }
-        .message-sent { align-self: flex-end; background-color: var(--mango-dark); color: #ffffff; border-bottom-right-radius: 4px; }
-        .message-received { align-self: flex-start; background-color: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; }
-        /* NOUVEAU: Style de la bulle IA */
+        
         .message-ai { align-self: flex-start; background: linear-gradient(135deg, #fffbeb, #fef3c7); color: #92400e; border: 1px solid #fde68a; border-bottom-left-radius: 4px; border-top-left-radius: 16px; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1), 0 2px 4px -1px rgba(245, 158, 11, 0.06); }
         .message-ai .message-time { color: #b45309; }
 
@@ -92,10 +90,15 @@ if ($vendor_id !== null) {
         .tick-sent { color: #94a3b8; } 
         .tick-read { color: #3b82f6; } 
         
+        .delete-conv-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #cbd5e1; display: none; padding: 10px; border-radius: 50%; }
+        .conversation-item:hover .delete-conv-btn { display: flex; align-items: center; justify-content: center; }
+        .delete-conv-btn:hover { color: #ef4444; background: #fee2e2; }
+
         @media (max-width: 768px) {
             .inbox-sidebar { display: block; }
             .chat-main { display: none; }
             .chat-main.active { display: flex; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; }
+            .conversation-item .delete-conv-btn { display: flex; }
         }
     </style>
 </head>
@@ -140,15 +143,16 @@ if ($vendor_id !== null) {
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <!-- NOUVEAU: Bouton Son -->
-                            <button id="notifBtn" class="btn btn-light rounded-circle shadow-sm" onclick="toggleNotif()" title="Désactiver le son">
+                            <button id="notifBtn" class="btn btn-light rounded-circle shadow-sm" onclick="toggleNotif()" title="Désactiver le son des notifications">
                                 <i class="fa-solid fa-bell text-warning"></i>
                             </button>
                             
                             <div class="dropdown">
-                                <button class="btn btn-light rounded-circle" data-bs-toggle="dropdown"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+                                <button class="btn btn-light rounded-circle" data-bs-toggle="dropdown" title="Options de la discussion"><i class="fa-solid fa-ellipsis-vertical"></i></button>
                                 <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                                    <li><a class="dropdown-item text-danger" href="#" onclick="alert('Conversation signalée à l\'admin.')"><i class="fa-solid fa-flag me-2"></i>Signaler l'utilisateur</a></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="alert('Conversation signalée à l\'équipe de modération MAN GO.'); return false;"><i class="fa-solid fa-flag me-2"></i>Signaler l'utilisateur</a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteEntireConversation(); return false;"><i class="fa-solid fa-trash-can me-2"></i>Supprimer la discussion</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -182,16 +186,14 @@ if ($vendor_id !== null) {
                         </div>
 
                         <form id="sendMessageForm" onsubmit="handleSendMessage(event)">
-                            <form id="sendMessageForm" onsubmit="handleSendMessage(event)">
                             
-                            <!-- NOUVEAU : Zone de prévisualisation de la citation (cachée par défaut) -->
+                            <!-- Zone de prévisualisation de la citation -->
                             <div id="replyPreviewContainer" class="d-none bg-light p-2 mb-2 rounded border-start border-4 border-warning position-relative">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <div class="small fw-bold" style="color: var(--mango-orange);"><i class="fa-solid fa-reply me-1"></i> Réponse à :</div>
                                     <button type="button" class="btn-close btn-close-sm" onclick="cancelReply()" aria-label="Close"></button>
                                 </div>
                                 <div id="replyPreviewText" class="small text-truncate text-muted mt-1"></div>
-                                <!-- Champ caché pour stocker le texte original cité pour l'envoi -->
                                 <input type="hidden" id="quotedMessageInput" value="">
                             </div>
 
@@ -215,7 +217,7 @@ if ($vendor_id !== null) {
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('⚠️')">⚠️</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('💰')">💰</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('🛒')">🛒</button>
-                                            <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('🏷️')">🏷️</button>
+                                            <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('🏷️')">🏷</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('📍')">📍</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('🙏')">🙏</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('👍')">👍</button>
@@ -224,7 +226,7 @@ if ($vendor_id !== null) {
                                 </div>
 
                                 <div class="input-group shadow-sm rounded-pill p-1 bg-white border border-secondary border-opacity-25 flex-grow-1">
-                                    <input type="text" id="messageInput" class="form-control border-0 bg-transparent shadow-none px-4" placeholder="Écrivez ou dictez un message..." autocomplete="off" spellcheck="true" lang="fr">
+                                    <input type="text" id="messageInput" class="form-control border-0 bg-transparent shadow-none px-4 transition-all" placeholder="Écrivez ou dictez un message..." autocomplete="off" spellcheck="true" lang="fr">
                                     <button class="btn text-white rounded-pill px-4 fw-bold transition" style="background-color: var(--mango-orange);" type="submit" id="sendBtn">
                                         <i class="fa-solid fa-paper-plane"></i>
                                     </button>
@@ -252,29 +254,57 @@ if ($vendor_id !== null) {
     let pollInterval = null;
     let lastMessagesHtml = ''; 
     
-    // NOUVEAU : Variables pour le Son et les Messages Importants
     let soundEnabled = true;
-    const notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'); // Petit bip professionnel
+    const notifSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     let lastMessageId = 0;
+    
+    let deletedConversations = JSON.parse(localStorage.getItem('mango_deleted_convs')) || [];
     
     const SpeechRecognition = window.SpeechRecognition ? window.SpeechRecognition : (window.webkitSpeechRecognition ? window.webkitSpeechRecognition : null);
     let recognition = null;
     let isRecording = false;
 
+    // === GESTION DE LA DICTÉE VOCALE (Avec UI Feedback direct) ===
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.lang = 'fr-FR'; 
         recognition.interimResults = false;
+        
+        recognition.onstart = function() {
+            isRecording = true;
+            const micBtn = document.getElementById('micBtn');
+            const inputField = document.getElementById('messageInput');
+            
+            // Effets visuels style WhatsApp (Couleur, Icône, Placeholder)
+            micBtn.classList.add('recording');
+            micBtn.innerHTML = '<i class="fa-solid fa-microphone-lines fa-fade fa-lg"></i>';
+            inputField.placeholder = "🎙️ Écoute en cours... Parlez !";
+            inputField.classList.add('bg-danger', 'bg-opacity-10'); // Léger fond rouge
+        };
+        
         recognition.onresult = function(event) {
             const transcript = event.results[0][0].transcript;
             const inputField = document.getElementById('messageInput');
             inputField.value = inputField.value ? inputField.value + ' ' + transcript : transcript;
             inputField.focus();
         };
+
         recognition.onend = function() {
             isRecording = false;
-            document.getElementById('micBtn').classList.remove('recording');
+            const micBtn = document.getElementById('micBtn');
+            const inputField = document.getElementById('messageInput');
+            
+            // On remet tout à l'état normal
+            micBtn.classList.remove('recording');
+            micBtn.innerHTML = '<i class="fa-solid fa-microphone fa-lg"></i>';
+            inputField.placeholder = "Écrivez ou dictez un message...";
+            inputField.classList.remove('bg-danger', 'bg-opacity-10');
+        };
+
+        recognition.onerror = function(event) {
+            console.error("Erreur de dictée : ", event.error);
+            recognition.onend(); // Réinitialise l'interface en cas d'erreur
         };
     }
 
@@ -300,18 +330,14 @@ if ($vendor_id !== null) {
             const textResponse = await response.text();
             let conversations;
             
-            try {
-                conversations = JSON.parse(textResponse);
-            } catch (parseError) {
-                inboxList.innerHTML = `<div class="text-center p-4 text-danger"><i class="fa-solid fa-triangle-exclamation mb-2"></i><br>Erreur serveur API.</div>`;
-                return;
+            try { conversations = JSON.parse(textResponse); } 
+            catch (parseError) { return; }
+            
+            if(conversations && conversations.length > 0) {
+                conversations = conversations.filter(conv => !deletedConversations.includes(conv.contact_id));
             }
-            
-            let isEmpty = false;
-            if (conversations == null) { isEmpty = true; }
-            if (conversations && conversations.length === 0) { isEmpty = true; }
-            
-            if (isEmpty) {
+
+            if (!conversations || conversations.length === 0) {
                 inboxList.innerHTML = `<div class="text-center p-5 text-muted"><i class="fa-solid fa-inbox fa-2x mb-3 text-light"></i><br>Aucune conversation.</div>`;
                 return;
             }
@@ -326,20 +352,17 @@ if ($vendor_id !== null) {
                 const initial = contactName.charAt(0).toUpperCase();
                 
                 let unreadBadge = '';
-                if (conv.is_read == 0) {
-                    if (conv.receiver_id == CURRENT_USER_ID) {
-                        unreadBadge = '<span class="badge bg-danger rounded-pill shadow-sm">Nouveau</span>';
-                    }
+                if (conv.is_read == 0 && conv.receiver_id == CURRENT_USER_ID) {
+                    unreadBadge = '<span class="badge bg-danger rounded-pill shadow-sm">Nouveau</span>';
                 }
 
-                // NOUVEAU : Nettoie l'aperçu du message pour cacher la balise [QUOTE]
                 let cleanPreview = conv.message ? conv.message.replace(/\[QUOTE\](.*?)\[\/QUOTE\]\n?/g, '↪️ Réponse : ') : '';
 
                 html += `
                     <div class="conversation-item ${isActive}" onclick="openChat(${conv.contact_id}, '${escapeHtml(contactName)}')">
                         <div class="d-flex align-items-center gap-3">
                             <div class="avatar-circle shadow-sm">${initial}</div>
-                            <div class="flex-grow-1 overflow-hidden">
+                            <div class="flex-grow-1 overflow-hidden pe-4">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <h6 class="m-0 fw-bold text-dark text-truncate">${escapeHtml(contactName)}</h6>
                                     <small class="text-muted" style="font-size:0.7rem;">${formatTime(conv.created_at)}</small>
@@ -350,6 +373,9 @@ if ($vendor_id !== null) {
                                 </div>
                             </div>
                         </div>
+                        <button class="delete-conv-btn shadow-sm" onclick="hideConversation(event, ${conv.contact_id})" title="Effacer la discussion de mon écran">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
                     </div>
                 `;
             });
@@ -359,7 +385,43 @@ if ($vendor_id !== null) {
         }
     }
 
+    function hideConversation(event, contactId) {
+        event.stopPropagation();
+        if(confirm("Voulez-vous retirer cette discussion de votre écran ? L'historique sera conservé en sécurité en cas de litige.")) {
+            deletedConversations.push(contactId);
+            localStorage.setItem('mango_deleted_convs', JSON.stringify(deletedConversations));
+            
+            if (activeReceiverId == contactId) {
+                document.getElementById('chatHeader').style.display = 'none';
+                document.getElementById('chatInputArea').style.display = 'none';
+                document.getElementById('chatMessages').innerHTML = `
+                    <div class="text-center my-auto text-muted">
+                        <div class="bg-white p-4 rounded-circle shadow-sm d-inline-block mb-3">
+                            <i class="fa-solid fa-comments fa-3x text-warning"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark">Vos messages s'affichent ici</h5>
+                        <p class="small">Sélectionnez une conversation dans le menu de gauche.</p>
+                    </div>
+                `;
+                activeReceiverId = null;
+                if(pollInterval) clearInterval(pollInterval);
+            }
+            loadInbox();
+        }
+    }
+
+    function deleteEntireConversation() {
+        if(activeReceiverId) {
+            hideConversation({ stopPropagation: function(){} }, activeReceiverId);
+        }
+    }
+
     function openChat(receiverId, contactName) {
+        if (deletedConversations.includes(receiverId)) {
+            deletedConversations = deletedConversations.filter(id => id !== receiverId);
+            localStorage.setItem('mango_deleted_convs', JSON.stringify(deletedConversations));
+        }
+
         activeReceiverId = receiverId;
         document.getElementById('chatHeader').style.display = 'flex';
         document.getElementById('chatInputArea').style.display = 'block';
@@ -380,20 +442,12 @@ if ($vendor_id !== null) {
             const textResponse = await response.text();
             let messages;
             
-            try {
-                messages = JSON.parse(textResponse);
-            } catch (e) { 
-                 return;
-            }
+            try { messages = JSON.parse(textResponse); } catch (e) { return; }
             
             const messagesContainer = document.getElementById('chatMessages');
             const isScrolledToBottom = messagesContainer.scrollHeight - messagesContainer.clientHeight <= messagesContainer.scrollTop + 50;
             
-            let isMsgEmpty = false;
-            if (messages == null) { isMsgEmpty = true; }
-            if (messages && messages.length === 0) { isMsgEmpty = true; }
-
-            if (isMsgEmpty) {
+            if (!messages || messages.length === 0) {
                 if(messagesContainer.innerHTML.indexOf('fa-handshake') === -1) {
                     messagesContainer.innerHTML = `
                         <div class="text-center my-auto text-muted pt-5">
@@ -407,25 +461,22 @@ if ($vendor_id !== null) {
                 return;
             }
 
-            // NOUVEAU : On récupère les messages marqués comme importants dans le stockage du navigateur
             let starredMsgs = JSON.parse(localStorage.getItem('mango_starred')) || [];
             let html = '';
 
             messages.forEach(msg => {
                 const isSent = (msg.sender_id == CURRENT_USER_ID);
-                const isAi = (msg.is_ai == 1); // Vérifie si c'est un message généré par l'IA
+                const isAi = (msg.is_ai == 1);
                 
-                // Détermine la classe CSS de la bulle (Sent, Received, ou AI)
                 let bubbleClass = 'message-received';
-                if (isSent) {
-                    bubbleClass = 'message-sent';
-                } else if (isAi) {
-                    bubbleClass = 'message-ai';
-                }
+                if (isSent) { bubbleClass = 'message-sent'; } 
+                else if (isAi) { bubbleClass = 'message-ai'; }
 
                 const isDeleted = msg.message.indexOf('🚫') !== -1;
                 const isStarred = starredMsgs.includes(msg.id); 
                 
+                let starBadge = isStarred ? '<i class="fa-solid fa-star text-warning position-absolute" style="top: -8px; left: -8px; font-size: 1.2rem; filter: drop-shadow(0 2px 2px rgba(0,0,0,0.1));"></i>' : '';
+
                 let readStatus = '';
                 if (isSent) {
                     readStatus = msg.is_read == 1 ? '<i class="fa-solid fa-check-double tick-read ms-1" title="Lu"></i>' : '<i class="fa-solid fa-check tick-sent ms-1" title="Envoyé"></i>';
@@ -437,7 +488,7 @@ if ($vendor_id !== null) {
                 if (!isDeleted) {
                     let menuItems = '';
                     
-                    // L'IA n'a pas besoin de toutes les options (on peut traduire, mais on ne signale pas sa propre IA)
+                    menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="toggleImportant(${msg.id}); return false;"><i class="fa-solid fa-star me-2 ${isStarred ? 'text-warning' : 'text-secondary'}"></i> ${isStarred ? 'Retirer des favoris' : 'Marquer comme important'}</a></li>`;
                     menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="navigator.clipboard.writeText('${safeText}'); alert('Message copié !'); return false;"><i class="fa-regular fa-copy me-2 text-secondary"></i> Copier</a></li>`;
                     menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="replyToMessage('${safeText}'); return false;"><i class="fa-solid fa-reply me-2 text-secondary"></i> Répondre</a></li>`;
                     
@@ -447,7 +498,7 @@ if ($vendor_id !== null) {
                     
                     if (isSent) {
                         menuItems += `<li><hr class="dropdown-divider"></li>`;
-                        menuItems += `<li><a class="dropdown-item text-danger py-2" href="#" onclick="deleteMessage(${msg.id}); return false;"><i class="fa-regular fa-trash-can me-2"></i> Supprimer</a></li>`;
+                        menuItems += `<li><a class="dropdown-item text-danger py-2" href="#" onclick="deleteMessage(${msg.id}); return false;"><i class="fa-regular fa-trash-can me-2"></i> Supprimer (pour tous)</a></li>`;
                     }
 
                     let chevronColor = isSent ? 'text-white-50' : (isAi ? 'text-warning' : 'text-secondary');
@@ -456,7 +507,7 @@ if ($vendor_id !== null) {
                             <button class="btn btn-sm p-0 border-0 ${chevronColor}" type="button" data-bs-toggle="dropdown">
                                 <i class="fa-solid fa-chevron-down" style="font-size: 0.8rem;"></i>
                             </button>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="font-size: 0.9rem; min-width: 150px; z-index: 1050; border-radius: 8px;">
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0" style="font-size: 0.9rem; min-width: 200px; z-index: 1050; border-radius: 8px;">
                                 ${menuItems}
                             </ul>
                         </div>
@@ -465,12 +516,9 @@ if ($vendor_id !== null) {
 
                 let displayMessage = escapeHtml(msg.message);
                 
-                // NOUVEAU: Si c'est un message IA, on ajoute une petite entête visuelle
                 let aiHeader = '';
                 if (isAi && !isDeleted) {
-                    // On retire le texte brut "🤖 IA : " que le backend a ajouté pour le remplacer par un bel affichage HTML
                     displayMessage = displayMessage.replace(/^🤖 IA : /, '').replace(/^🤖 Réponse automatique : /, '');
-                    
                     aiHeader = `
                         <div class="d-flex align-items-center mb-2 pb-1 border-bottom" style="border-color: rgba(245,158,11,0.2) !important;">
                             <div class="bg-amber-100 text-amber-600 rounded-circle d-flex align-items-center justify-center me-2" style="width:24px; height:24px; font-size:0.7rem;">
@@ -482,21 +530,13 @@ if ($vendor_id !== null) {
                 }
 
                 let customBubbleStyle = !isDeleted ? 'padding-right: 25px;' : '';
-                // ==========================================================
-                // FORMATAGE DU BLOC "RÉPONSE" (Style WhatsApp)
-                // ==========================================================
-                let replyBlock = '';
                 
-                // Détecte le séparateur qu'on a créé à l'envoi
+                let replyBlock = '';
                 const quoteRegex = /\[QUOTE\](.*?)\[\/QUOTE\]/;
                 const quoteMatch = displayMessage.match(quoteRegex);
-                
                 if (quoteMatch) {
                     const quotedText = quoteMatch[1];
-                    // Retire la balise du message principal
                     displayMessage = displayMessage.replace(quoteRegex, ''); 
-                    
-                    // Crée le bloc visuel
                     replyBlock = `
                         <div class="mb-2 p-2 rounded" style="background-color: rgba(0,0,0,0.05); border-left: 4px solid var(--mango-orange); font-size: 0.85rem; color: #64748b;">
                             <div class="fw-bold mb-1" style="color: var(--mango-orange);"><i class="fa-solid fa-reply me-1"></i> Réponse :</div>
@@ -509,13 +549,8 @@ if ($vendor_id !== null) {
                     <div class="message-bubble ${bubbleClass} d-flex flex-column shadow-sm" id="msg-${msg.id}" style="${customBubbleStyle}">
                         ${starBadge}
                         ${actionsMenu}
-                        
-                        <!-- L'en-tête IA s'affiche ici si c'est un message IA -->
                         ${aiHeader}
-                        
-                        <!-- Le bloc de citation WhatsApp s'affiche ici s'il existe -->
                         ${replyBlock}
-                        
                         ${displayMessage}
                         <div id="trans-${msg.id}"></div>
                         <div class="message-time mt-1">
@@ -526,12 +561,11 @@ if ($vendor_id !== null) {
                 `;
             });
             
-            // NOUVEAU : Logique du BIP SONORE
             if (messages.length > 0) {
                 let latestMsg = messages[messages.length - 1];
                 if (latestMsg.id > lastMessageId) {
                     if (lastMessageId !== 0 && latestMsg.sender_id != CURRENT_USER_ID && soundEnabled) {
-                        notifSound.play().catch(e => console.log("Son bloqué par le navigateur"));
+                        notifSound.play().catch(e => console.log("Son bloqué"));
                     }
                     lastMessageId = latestMsg.id;
                 }
@@ -547,28 +581,20 @@ if ($vendor_id !== null) {
         } catch (error) {}
     }
 
-    // ==========================================================
-    // FONCTION : PRÉPARER UNE RÉPONSE (Style WhatsApp)
-    // ==========================================================
     window.replyToMessage = function(text) {
-        // Nettoyer le texte
         let cleanText = text.replace(/(\r\n|\n|\r)/gm, " ");
         let shortText = cleanText.length > 60 ? cleanText.substring(0, 60) + "..." : cleanText;
         
-        // Afficher la zone de prévisualisation
         const previewContainer = document.getElementById('replyPreviewContainer');
         const previewText = document.getElementById('replyPreviewText');
         const hiddenInput = document.getElementById('quotedMessageInput');
         
         previewText.innerText = shortText;
-        hiddenInput.value = shortText; // On stocke le texte pour l'envoi
+        hiddenInput.value = shortText;
         previewContainer.classList.remove('d-none');
-        
-        // Focus sur le champ principal
         document.getElementById('messageInput').focus();
     };
 
-    // Annuler la réponse
     function cancelReply() {
         document.getElementById('replyPreviewContainer').classList.add('d-none');
         document.getElementById('quotedMessageInput').value = '';
@@ -578,32 +604,26 @@ if ($vendor_id !== null) {
         soundEnabled = !soundEnabled;
         const btn = document.getElementById('notifBtn');
         btn.innerHTML = soundEnabled ? '<i class="fa-solid fa-bell text-warning"></i>' : '<i class="fa-solid fa-bell-slash text-muted"></i>';
-        btn.title = soundEnabled ? 'Désactiver le son' : 'Activer le son';
+        btn.title = soundEnabled ? 'Désactiver le son des notifications' : 'Activer le son des notifications';
     }
 
     function toggleImportant(msgId) {
         let starred = JSON.parse(localStorage.getItem('mango_starred')) || [];
         if (starred.includes(msgId)) {
-            starred = starred.filter(id => id !== msgId); // Retire
+            starred = starred.filter(id => id !== msgId);
         } else {
-            starred.push(msgId); // Ajoute
+            starred.push(msgId); 
         }
         localStorage.setItem('mango_starred', JSON.stringify(starred));
-        lastMessagesHtml = ''; // Force le rafraîchissement immédiat
+        lastMessagesHtml = ''; 
         loadMessages(); 
     }
 
     function toggleDictation() {
-        if (!recognition) {
-            alert("Votre navigateur ne supporte pas la dictée vocale.");
-            return;
-        }
-        if (isRecording) {
-            recognition.stop();
-        } else {
+        if (!recognition) { alert("Navigateur incompatible."); return; }
+        if (isRecording) { recognition.stop(); } 
+        else {
             recognition.start();
-            isRecording = true;
-            document.getElementById('micBtn').classList.add('recording');
         }
     }
 
@@ -640,7 +660,7 @@ if ($vendor_id !== null) {
             const translatedText = data[0].map(item => item[0]).join('');
             container.innerHTML = `<hr class="my-1 border-secondary opacity-25"><small class="text-info fw-bold"><i class="fa-solid fa-language me-1"></i> Traduit : ${escapeHtml(translatedText)}</small>`;
         } catch (e) {
-            container.innerHTML = '<small class="text-danger">Erreur de traduction.</small>';
+            container.innerHTML = '<small class="text-danger">Erreur.</small>';
         }
     }
 
@@ -654,11 +674,9 @@ if ($vendor_id !== null) {
         if (!message) return;
         if (!activeReceiverId) return;
 
-        // Si une citation est préparée, on la formate pour le backend
         if (hiddenQuoteInput && hiddenQuoteInput.value) {
-            // On utilise un séparateur unique [QUOTE]...[/QUOTE]
             message = `[QUOTE]${hiddenQuoteInput.value}[/QUOTE]\n${message}`;
-            cancelReply(); // On cache la petite fenêtre de prévisualisation
+            cancelReply(); 
         }
 
         sendBtn.disabled = true;
@@ -680,6 +698,11 @@ if ($vendor_id !== null) {
                     await loadMessages();
                     const messagesContainer = document.getElementById('chatMessages');
                     messagesContainer.scrollTop = messagesContainer.scrollHeight; 
+                    
+                    if (deletedConversations.includes(activeReceiverId)) {
+                        deletedConversations = deletedConversations.filter(id => id !== activeReceiverId);
+                        localStorage.setItem('mango_deleted_convs', JSON.stringify(deletedConversations));
+                    }
                     loadInbox();
                 } else {
                     alert(result.message ? result.message : "Erreur lors de l'envoi.");
@@ -688,7 +711,7 @@ if ($vendor_id !== null) {
                 alert("Erreur serveur : " + textResult);
             }
         } catch (error) { 
-            alert("Erreur de connexion au serveur.");
+            alert("Erreur de connexion.");
         } finally {
             sendBtn.disabled = false;
             sendBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
@@ -728,33 +751,28 @@ if ($vendor_id !== null) {
         return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     }
 
-    // Générer la géolocalisation SANS envoyer
     function sendLocation() {
         if (!navigator.geolocation) {
-            alert("La géolocalisation n'est pas supportée par votre appareil/navigateur.");
+            alert("La géolocalisation n'est pas supportée.");
             return;
         }
 
         const input = document.getElementById('messageInput');
-        const originalText = input.value; // On garde ce que l'utilisateur avait déjà écrit
-        input.value = "📍 Calcul de la position en cours...";
-        toggleAttachmentMenu(); // Ferme le menu
+        const originalText = input.value; 
+        input.value = "📍 Calcul de la position...";
+        toggleAttachmentMenu(); 
 
         navigator.geolocation.getCurrentPosition(
             (position) => {
                 const lat = position.coords.latitude;
                 const lng = position.coords.longitude;
                 const mapLink = `📍 Ma position : https://www.google.com/maps?q=${lat},${lng}`;
-                
-                // Remplace le texte d'attente par le vrai lien, sans effacer le reste
                 input.value = originalText + (originalText ? " " : "") + mapLink;
                 input.focus();
             },
             (error) => {
-                input.value = originalText; // On remet le texte d'origine
-                let msg = "Impossible d'obtenir votre position. ";
-                if(error.code === 1) msg += "Vous avez refusé l'accès au GPS.";
-                alert(msg);
+                input.value = originalText; 
+                alert("Impossible d'obtenir votre position. Avez-vous autorisé l'accès GPS ?");
             },
             { enableHighAccuracy: true, timeout: 10000 }
         );
@@ -773,7 +791,6 @@ if ($vendor_id !== null) {
             }
         } catch(e) {}
     }
-
 </script>
 </body>
 </html>

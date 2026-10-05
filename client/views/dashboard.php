@@ -139,9 +139,8 @@ try {
             </a>
 
             <div class="relative group mt-2">
-                <a href="#" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-400 opacity-50 cursor-not-allowed transition-all">
-                    <i class="fa-solid fa-bag-shopping w-6 text-center mr-2"></i> Mes Achats
-                    <i class="fa-solid fa-lock ml-auto text-xs"></i>
+                <a href="<?= $baseUrl ?>/purchases.php" class="nav-link w-full flex items-center px-4 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-100 transition-all mt-2">
+                    <i class="fa-solid fa-bag-shopping w-6 text-center mr-2 text-sky-400"></i> Mes Achats
                 </a>
                 <!-- INFOBULLE ACHATS -->
                 <div class="opacity-0 w-48 bg-slate-800 text-white text-[10px] font-normal rounded-lg py-2 px-3 absolute z-10 top-1/2 left-full -translate-y-1/2 ml-2 pointer-events-none group-hover:opacity-100 transition-opacity duration-300 shadow-xl border border-slate-700">
