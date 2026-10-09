@@ -60,15 +60,15 @@ if (file_exists($headerPath)) { require_once $headerPath; }
 function getStatusBadge($status) {
     switch (strtolower($status)) {
         case 'pending':
-            return '<span class="bg-orange-100 text-orange-700 border border-orange-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-clock"></i> En attente</span>';
+            return '<span class="bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-clock"></i> En attente</span>';
         case 'paid':
-            return '<span class="bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-credit-card"></i> Payé</span>';
+            return '<span class="bg-blue-100 text-blue-700 border border-blue-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-check"></i> Payée</span>';
         case 'shipped':
-            return '<span class="bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-truck-fast"></i> Expédié</span>';
+            return '<span class="bg-purple-100 text-purple-700 border border-purple-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-truck-fast"></i> Expédiée</span>';
         case 'delivered':
-            return '<span class="bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-box-open"></i> Livré</span>';
+            return '<span class="bg-emerald-100 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-box-open"></i> Livrée</span>';
         case 'cancelled':
-            return '<span class="bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-ban"></i> Annulé</span>';
+            return '<span class="bg-rose-100 text-rose-700 border border-rose-200 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1"><i class="fa-solid fa-ban"></i> Annulée</span>';
         default:
             return '<span class="bg-slate-100 text-slate-700 px-3 py-1 rounded-full text-[10px] font-black uppercase">Inconnu</span>';
     }
@@ -93,8 +93,9 @@ function getStatusBadge($status) {
             <div class="bg-rose-50 text-rose-700 border border-rose-200 p-6 rounded-2xl flex items-center gap-4 shadow-sm">
                 <i class="fa-solid fa-triangle-exclamation text-3xl"></i>
                 <div>
-                    <h3 class="font-bold text-lg">Erreur de base de données</h3>
-                    <p class="text-sm">La table <strong>orders</strong> n'a pas été trouvée. Veuillez exécuter le script SQL fourni dans phpMyAdmin.</p>
+                    <h3 class="font-bold text-lg">Erreur de requête SQL</h3>
+                    <p class="text-sm">Une erreur s'est produite lors de la lecture des données :</p>
+                    <code class="block mt-2 bg-rose-100 p-2 rounded text-xs font-mono text-rose-800"><?= htmlspecialchars($sqlErrorMessage) ?></code>
                 </div>
             </div>
         <?php elseif (empty($orders)): ?>
@@ -113,7 +114,7 @@ function getStatusBadge($status) {
                 </a>
             </div>
         <?php else: ?>
-            <!-- LISTE DES COMMANDES (S'affichera dès qu'un achat sera fait) -->
+            <!-- LISTE DES COMMANDES -->
             <div class="space-y-6">
                 <?php foreach ($orders as $order): ?>
                     <?php 
@@ -160,15 +161,30 @@ function getStatusBadge($status) {
                                 <a href="<?= $baseUrl ?>/chat.php?vendor_id=<?= $order['vendor_id'] ?>" class="w-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-bold py-2.5 px-4 rounded-xl transition text-xs text-center flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-message"></i> Contacter le vendeur
                                 </a>
+                                
+                                <!-- ========================================================= -->
+                                <!-- NOUVEAU BOUTON DYNAMIQUE : LE REÇU OFFICIEL -->
+                                <!-- ========================================================= -->
+                                <?php if (in_array($order['status'], ['paid', 'shipped', 'delivered'])): ?>
+                                    <div class="relative group w-full text-left">
+                                        <a href="<?= $baseUrl ?>/receipt.php?id=<?= $order['id'] ?>" target="_blank" class="w-full bg-white hover:bg-amber-500 text-slate-700 hover:text-slate-900 border border-slate-200 hover:border-amber-500 font-black py-2.5 px-4 rounded-xl text-xs transition-all flex items-center justify-center gap-2 shadow-sm">
+                                            <i class="fa-solid fa-file-invoice text-amber-500 group-hover:text-slate-900"></i> Le Reçu
+                                        </a>
+                                        <!-- Infobulle -->
+                                        <div class="opacity-0 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-slate-800 text-white text-[10px] py-2.5 px-3 rounded-xl pointer-events-none transition-opacity duration-300 group-hover:opacity-100 shadow-2xl text-center z-20 font-medium">
+                                            <strong class="text-amber-500 block mb-1 uppercase tracking-widest text-[9px]">Document Sécurisé</strong>
+                                            Téléchargez ou imprimez votre preuve d'achat en un clic.
+                                            <div class="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800"></div>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+
                                 <?php if ($order['status'] === 'delivered'): ?>
-                                    <button onclick="alert('Module d\'évaluation en cours de construction.')" class="w-full bg-slate-900 text-white hover:bg-slate-800 font-bold py-2.5 px-4 rounded-xl transition text-xs text-center flex items-center justify-center gap-2">
+                                    <button onclick="alert('Module d\'évaluation en cours de construction.')" class="w-full bg-slate-900 text-white hover:bg-slate-800 font-bold py-2.5 px-4 rounded-xl transition text-xs text-center flex items-center justify-center gap-2 mt-1">
                                         <i class="fa-solid fa-star text-amber-400"></i> Noter l'article
                                     </button>
-                                <?php else: ?>
-                                    <button onclick="alert('La génération de reçu PDF sera activée avec le module de paiement.')" class="w-full bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold py-2.5 px-4 rounded-xl transition text-xs text-center flex items-center justify-center gap-2">
-                                        <i class="fa-solid fa-download"></i> Télécharger le reçu
-                                    </button>
                                 <?php endif; ?>
+
                             </div>
                         </div>
                     </div>

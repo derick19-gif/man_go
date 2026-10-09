@@ -1,154 +1,85 @@
 <?php
-
 use App\Core\Database;
 
 class HomeController {
-
+    
     public function index() {
-        // Gestion de la configuration de l'URL
-        $baseUrl = defined('APP_URL') ? APP_URL : (defined('APP_URL') ? APP_URL : '/man_go');
-
-        // Connexion sécurisée à la base de données
+        $baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
         $dbInstance = Database::getInstance();
         $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection() : $dbInstance;
-
-        // Gestion de la langue
+        
         $lang = $_GET['lang'] ?? $_SESSION['lang'] ?? 'fr';
-        if (!in_array($lang, ['fr', 'en'], true)) {
-            $lang = 'fr';
+        if (!in_array($lang, ['fr', 'en'], true)) { 
+            $lang = 'fr'; 
         }
         $_SESSION['lang'] = $lang;
 
-        // Paramètres de recherche et de pagination
-        $search_query = trim($_GET['q'] ?? '');
-        $search_city  = trim($_GET['city'] ?? '');
-        $itemsPerPage = 8; // Changé à 8 pour faire 2 belles lignes de 4 annonces sur PC
-        $currentPage = isset($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
-
-        // Récupération des catégories (élargies pour la vision internationale)
+        // 1. Catégories
         try {
-            $stmtCats = $db->query("SELECT * FROM categories ORDER BY name ASC LIMIT 12");
+            $stmtCats = $db->query("
+                SELECT c.id, c.name_key, c.icon_class, COUNT(l.id) as total_listings
+                FROM categories c
+                LEFT JOIN listings l ON c.id = l.category_id AND LOWER(l.status) IN ('active', 'published', 'actif')
+                GROUP BY c.id
+                ORDER BY total_listings DESC LIMIT 8
+            ");
             $categories = $stmtCats->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {
-            $categories = [];
+        } catch (Exception $e) { 
+            $categories = []; 
         }
 
-        // Mapping des icônes FontAwesome étendu pour les multiples domaines d'activités
-        $iconMap = [
-            'electronique' => 'fa-laptop',
-            'high-tech'    => 'fa-mobile-screen-button',
-            'emploi'       => 'fa-user-tie',
-            'services'     => 'fa-handshake',
-            'immobilier'   => 'fa-building',
-            'maison'       => 'fa-couch',
-            'jardin'       => 'fa-leaf',
-            'mode'         => 'fa-shirt',
-            'vehicule'     => 'fa-car',
-            'auto'         => 'fa-car',
-            'hotel'        => 'fa-hotel',
-            'restauration' => 'fa-utensils',
-            'artisan'      => 'fa-hammer',
-            'ong'          => 'fa-globe',
-            'droit'        => 'fa-scale-balanced',
-            'comptable'    => 'fa-calculator'
-        ];
-
-        // Récupération et pagination des annonces
-        $listings = [];
-        $totalListings = 0;
-        $totalPages = 1;
-
+        // 2. Annonces Actives (Attribuées à $listings pour la vue)
         try {
-            // CORRECTION CRUCIALE : On cherche les annonces dont le statut est 'active', 'ACTIVE' ou 'PUBLISHED'
-            $whereConditions = ["LOWER(l.status) IN ('active', 'published')"];
-            $params = [];
-
-            // Recherche textuelle globale
-            if (!empty($search_query)) {
-                $whereConditions[] = "(l.title LIKE :q OR l.description LIKE :q)";
-                $params[':q'] = '%' . $search_query . '%';
-            }
-
-            // Recherche par ville/location (uniquement si la colonne existe dans votre base)
-            if (!empty($search_city)) {
-                // Pour éviter un crash PDO si la colonne n'existe pas, on cherche aussi dans la description
-                $whereConditions[] = "(l.description LIKE :city OR l.title LIKE :city)";
-                $params[':city'] = '%' . $search_city . '%';
-            }
-
-            $whereSql = " WHERE " . implode(" AND ", $whereConditions);
-
-            // Total des éléments pour pagination
-            $sqlCount = "SELECT COUNT(*) FROM listings l" . $whereSql;
-            $stmtCount = $db->prepare($sqlCount);
-            $stmtCount->execute($params);
-            $totalListings = (int) $stmtCount->fetchColumn();
-
-            $totalPages = max(1, ceil($totalListings / $itemsPerPage));
-            if ($currentPage > $totalPages) {
-                $currentPage = $totalPages;
-            }
-
-            $offset = ($currentPage - 1) * $itemsPerPage;
-
-            // Requête des annonces limitées (On joint les catégories)
-            $sqlListings = "SELECT l.*, c.name_key AS category_name 
-                            FROM listings l 
-                            LEFT JOIN categories c ON l.category_id = c.id 
-                            " . $whereSql . " 
-                            ORDER BY l.created_at DESC 
-                            LIMIT :limit OFFSET :offset";
-
-            $stmtListings = $db->prepare($sqlListings);
-            foreach ($params as $key => $val) {
-                $stmtListings->bindValue($key, $val, PDO::PARAM_STR);
-            }
-            $stmtListings->bindValue(':limit', $itemsPerPage, PDO::PARAM_INT);
-            $stmtListings->bindValue(':offset', $offset, PDO::PARAM_INT);
-
-            $stmtListings->execute();
+            $stmtListings = $db->query("
+                SELECT l.*, c.name_key AS category_name, u.firstname, u.lastname, s.city
+                FROM listings l
+                LEFT JOIN categories c ON l.category_id = c.id
+                LEFT JOIN users u ON l.user_id = u.id
+                LEFT JOIN stands s ON u.id = s.user_id
+                WHERE LOWER(l.status) IN ('active', 'published', 'actif')
+                ORDER BY l.created_at DESC
+                LIMIT 12
+            ");
             $listings = $stmtListings->fetchAll(PDO::FETCH_ASSOC);
-
-        } catch (Exception $e) {
-            error_log("Erreur dans HomeController: " . $e->getMessage());
-            $listings = [];
-            $totalListings = 0;
-            $totalPages = 1;
+        } catch (Exception $e) { 
+            $listings = []; 
         }
 
-        // Helper de génération d'URL pour la pagination
-        $buildUrl = function(array $newParams = []): string {
-            $queryParams = $_GET;
-            foreach ($newParams as $key => $value) {
-                if ($value === null) {
-                    unset($queryParams[$key]);
-                } else {
-                    $queryParams[$key] = $value;
-                }
-            }
-            return '?' . http_build_query($queryParams);
-        };
+        // Aliases de sécurité pour couvrir toutes les variantes du template
+        $recentListings = $listings;
+        $recentAds = $listings;
+        $totalListings = count($listings);
 
-        $getCategoryIcon = function(?string $name, array $map): string {
-            if (empty($name)) {
-                return 'fa-layer-group';
-            }
-            $lower = mb_strtolower($name, 'UTF-8');
-            foreach ($map as $key => $icon) {
-                if (str_contains($lower, $key)) {
-                    return $icon;
-                }
-            }
-            return 'fa-layer-group';
-        };
+        // 3. Annonces VIP (Premium)
+        try {
+            $stmtVip = $db->query("
+                SELECT l.*, c.name_key AS category_name, u.firstname, u.lastname, s.city
+                FROM listings l
+                LEFT JOIN categories c ON l.category_id = c.id
+                LEFT JOIN users u ON l.user_id = u.id
+                LEFT JOIN stands s ON u.id = s.user_id
+                JOIN user_subscriptions us ON l.user_id = us.user_id
+                WHERE LOWER(l.status) IN ('active', 'published', 'actif') 
+                  AND us.plan_id = 2 
+                  AND us.status = 'active' 
+                  AND us.end_date > NOW()
+                ORDER BY RAND() LIMIT 4
+            ");
+            $vipListings = $stmtVip->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) { 
+            $vipListings = []; 
+        }
 
-        // 4. Chargement de la VUE (qui contient tout le HTML)
+        // 4. Chargement de la vue home.php
         $viewPath = __DIR__ . '/../views/home.php';
+        if (!file_exists($viewPath)) {
+            $viewPath = __DIR__ . '/../../themes/default/templates/home.php';
+        }
+        
         if (file_exists($viewPath)) {
-            // Ces variables seront disponibles dans la vue
             require_once $viewPath;
         } else {
-            echo "Erreur : La vue home.php est introuvable à l'emplacement " . $viewPath;
+            echo "Erreur : La vue home.php est introuvable.";
         }
     }
 }

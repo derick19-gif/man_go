@@ -51,11 +51,20 @@ $stmtComm = $db->prepare("SELECT COALESCE(SUM(commission_amount), 0) as total FR
 $stmtComm->execute([$userId]);
 $commissionsValidees = (float)$stmtComm->fetch(PDO::FETCH_ASSOC)['total'];
 
-// Somme des commissions en attente (optionnel)
+// Somme des commissions en attente
 $stmtPending = $db->prepare("SELECT COALESCE(SUM(commission_amount), 0) as total FROM referral_commissions WHERE referrer_id = ? AND status = 'pending'");
 $stmtPending->execute([$userId]);
 $commissionsEnAttente = (float)$stmtPending->fetch(PDO::FETCH_ASSOC)['total'];
-$commissionPercent = defined('REFERRAL_COMMISSION_PERCENT') ? REFERRAL_COMMISSION_PERCENT : 20;
+
+// ---------------------------------------------------------------------
+// CONNEXION DYNAMIQUE A LA COMMISSION DE PARRAINAGE
+// ---------------------------------------------------------------------
+$stmtSetting = $db->prepare("SELECT setting_value FROM system_settings WHERE setting_key = 'referral_commission'");
+$stmtSetting->execute();
+$dbComm = $stmtSetting->fetchColumn();
+
+// Si on trouve la valeur dans la BDD on l'utilise, sinon on met 20 par défaut
+$commissionPercent = ($dbComm !== false) ? (int)$dbComm : 20;
 
 $pageTitle = "Programme Ambassadeur & Affiliation - MAN GO";
 

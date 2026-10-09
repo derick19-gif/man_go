@@ -30,7 +30,7 @@ if ($isVendor) {
     $btnLabel = 'Espace Pro';
     $btnIcon = 'fa-store';
 } elseif ($isAdmin) {
-    $dashboardLink = $baseUrl . '/admin/dashboard.php';
+    $dashboardLink = $baseUrl . '/mgo_secure_vault_9x/login.php';
     $btnLabel = 'Administration';
     $btnIcon = 'fa-hammer';
 } else {

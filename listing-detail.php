@@ -135,7 +135,7 @@ $pageTitle = $listing['title'] . " - MAN GO";
 require_once __DIR__ . '/themes/default/templates/layouts/header.php';
 ?>
 
-<div class="bg-white border-b border-slate-200 py-3 mt-0">
+<div class="bg-white border-b border-slate-200 py-3 mt-0 relative z-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-xs text-slate-500 flex items-center space-x-2">
         <a href="<?= $baseUrl ?>/" class="hover:text-amber-600 transition">Accueil</a>
         <span>/</span>
@@ -218,18 +218,42 @@ require_once __DIR__ . '/themes/default/templates/layouts/header.php';
 
         <div class="space-y-6">
             
-            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 text-center">
+            <div class="bg-white p-8 rounded-3xl shadow-sm border border-slate-200 text-center relative">
                 <span class="text-xs font-bold uppercase text-slate-400 tracking-wider block mb-2">Prix de vente</span>
-                <div class="flex items-center justify-center gap-3 mb-6">
-                    <span class="text-4xl font-black text-amber-500">
-                        <?= number_format($listing['price'], 0, ',', ' ') ?> <span class="text-2xl"><?= htmlspecialchars($listing['currency'] ?? 'FCFA') ?></span>
+                
+                <!-- ========================================== -->
+                <!-- PRIX ET CONVERTISSEUR DE DEVISES INTÉGRÉ   -->
+                <!-- ========================================== -->
+                <div class="flex items-center justify-center gap-2 mb-2">
+                    <span id="display-price" class="text-4xl font-black text-amber-500" data-xof="<?= $listing['price'] ?>">
+                        <?= number_format($listing['price'], 0, ',', ' ') ?>
                     </span>
-                    <?php if ($discountPercent > 0): ?>
-                        <span class="text-lg text-slate-300 line-through font-bold">
-                            <?= number_format($listing['original_price'], 0, ',', ' ') ?>
-                        </span>
-                    <?php endif; ?>
+                    <select id="currency-selector" onchange="convertCurrency()" class="bg-amber-100 text-amber-800 text-sm font-bold rounded-lg cursor-pointer focus:ring-0 py-1 px-2 border-none">
+                        <option value="XOF">FCFA</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                    </select>
                 </div>
+
+                <?php if ($discountPercent > 0): ?>
+                    <div class="text-lg text-slate-300 line-through font-bold mb-6">
+                        <?= number_format($listing['original_price'], 0, ',', ' ') ?> FCFA
+                    </div>
+                <?php else: ?>
+                    <div class="mb-6"></div>
+                <?php endif; ?>
+
+                <!-- ========================================== -->
+                <!-- BOUTON D'ACHAT (VISIBLE UNIQUEMENT PAR LES CLIENTS) -->
+                <!-- ========================================== -->
+                <?php if (!$isOwner): ?>
+                    <div class="mb-6">
+                        <a href="<?= $baseUrl ?>/checkout.php?id=<?= $listing['id'] ?>" class="w-full block bg-slate-900 hover:bg-amber-500 text-white hover:text-slate-900 font-black py-4 px-4 rounded-xl shadow-lg shadow-amber-500/20 transition-all transform hover:-translate-y-1 flex items-center justify-center space-x-2 text-sm">
+                            <i class="fa-solid fa-cart-shopping text-xl"></i>
+                            <span>Acheter maintenant</span>
+                        </a>
+                    </div>
+                <?php endif; ?>
 
                 <?php if ($isOwner): ?>
                     <div class="bg-slate-50 border border-slate-100 p-4 rounded-2xl mb-4">
@@ -243,12 +267,20 @@ require_once __DIR__ . '/themes/default/templates/layouts/header.php';
                     </div>
                 <?php endif; ?>
 
-                <div class="grid grid-cols-2 gap-2 mt-4">
-                    <a href="https://api.whatsapp.com/send?text=Découvrez l'annonce <?= $listingTitleUrl ?> sur MAN GO : <?= $currentListingUrl ?>" target="_blank" class="bg-slate-100 hover:bg-[#25D366] hover:text-white text-slate-600 font-bold py-2 rounded-xl text-xs transition flex items-center justify-center">
+                <div class="grid grid-cols-2 gap-2 mt-4 border-t border-slate-100 pt-4">
+                    <a href="https://api.whatsapp.com/send?text=Découvrez l'annonce <?= $listingTitleUrl ?> sur MAN GO : <?= $currentListingUrl ?>" target="_blank" class="relative group bg-slate-100 hover:bg-[#25D366] hover:text-white text-slate-600 font-bold py-2 rounded-xl text-xs transition flex items-center justify-center">
                         <i class="fa-brands fa-whatsapp mr-1 text-lg"></i> Partager
+                        <!-- Infobulle -->
+                        <div class="opacity-0 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white text-[10px] py-1 px-2 rounded pointer-events-none transition-opacity duration-300 group-hover:opacity-100 whitespace-nowrap">
+                            Envoyer sur WhatsApp
+                        </div>
                     </a>
-                    <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $currentListingUrl ?>" target="_blank" class="bg-slate-100 hover:bg-[#1877F2] hover:text-white text-slate-600 font-bold py-2 rounded-xl text-xs transition flex items-center justify-center">
+                    <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $currentListingUrl ?>" target="_blank" class="relative group bg-slate-100 hover:bg-[#1877F2] hover:text-white text-slate-600 font-bold py-2 rounded-xl text-xs transition flex items-center justify-center">
                         <i class="fa-brands fa-facebook mr-1 text-lg"></i> Partager
+                        <!-- Infobulle -->
+                        <div class="opacity-0 absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-slate-800 text-white text-[10px] py-1 px-2 rounded pointer-events-none transition-opacity duration-300 group-hover:opacity-100 whitespace-nowrap">
+                            Partager sur Facebook
+                        </div>
                     </a>
                 </div>
             </div>
@@ -273,15 +305,13 @@ require_once __DIR__ . '/themes/default/templates/layouts/header.php';
 
                 <?php if (!$isOwner): ?>
                     <div class="space-y-3 pt-4">
-                        <!-- BOUTON : CHAT INTERNE MAN GO SHIELD (Lien Absolu Sécurisé) -->
-                            <a href="/man_go/chat.php?vendor_id=<?= $listing['user_id'] ?>" 
-                               class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition flex items-center justify-center space-x-2 text-sm transform hover:-translate-y-0.5">
-                                <i class="fa-solid fa-message text-amber-500 text-xl"></i>
-                                <span>Discuter sur MAN GO</span>
-                            </a>
+                        <a href="<?= $baseUrl ?>/chat.php?vendor_id=<?= $listing['user_id'] ?>" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-4 px-4 rounded-xl shadow-lg transition flex items-center justify-center space-x-2 text-sm transform hover:-translate-y-0.5">
+                            <i class="fa-solid fa-message text-amber-500 text-xl"></i>
+                            <span>Discuter sur MAN GO</span>
+                        </a>
 
                         <?php if (!empty($clean_phone)): ?>
-                            <a href="<?= $whatsapp_url ?>" target="_blank" class="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-4 px-4 rounded-xl shadow transition flex items-center justify-center space-x-2 text-sm">
+                            <a href="<?= $whatsapp_url ?>" target="_blank" class="relative group w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold py-4 px-4 rounded-xl shadow transition flex items-center justify-center space-x-2 text-sm">
                                 <i class="fa-brands fa-whatsapp text-xl"></i>
                                 <span>WhatsApp Direct</span>
                             </a>
@@ -303,7 +333,7 @@ require_once __DIR__ . '/themes/default/templates/layouts/header.php';
                     <i class="fa-solid fa-shield-halved text-lg"></i>
                     <span>Sécurité MAN GO</span>
                 </div>
-                <p class="leading-relaxed">Ne payez jamais à l'avance. Inspectez le produit et remettez l'argent uniquement en mains propres dans un lieu public.</p>
+                <p class="leading-relaxed">Ne payez jamais un vendeur en dehors de la plateforme MAN GO. Utilisez le bouton "Acheter maintenant" pour une transaction 100% sécurisée.</p>
             </div>
         </div>
     </div>
@@ -333,6 +363,36 @@ require_once __DIR__ . '/themes/default/templates/layouts/header.php';
         </div>
     <?php endif; ?>
 </main>
+
+<!-- SCRIPT DU CONVERTISSEUR DE DEVISES -->
+<script>
+    const rateUSD = 600;
+    const rateEUR = 655;
+
+    function convertCurrency() {
+        const currency = document.getElementById('currency-selector').value;
+        const display = document.getElementById('display-price');
+        
+        // On récupère le prix original en FCFA depuis l'attribut data-xof
+        const amountFCFA = parseFloat(display.getAttribute('data-xof'));
+
+        let newAmount = amountFCFA;
+        let decimals = 0;
+
+        if (currency === 'USD') {
+            newAmount = amountFCFA / rateUSD;
+            decimals = 2;
+        } else if (currency === 'EUR') {
+            newAmount = amountFCFA / rateEUR;
+            decimals = 2;
+        }
+
+        display.innerText = new Intl.NumberFormat('fr-FR', {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals
+        }).format(newAmount);
+    }
+</script>
 
 <?php 
 require_once __DIR__ . '/themes/default/templates/layouts/footer.php';

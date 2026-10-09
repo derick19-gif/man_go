@@ -1,300 +1,418 @@
 <?php
 // =========================================================================
-// Page Mon Portefeuille (Wallet) - MAN GO
-// Gestion des Crédits, Commissions et Transferts P2P Sécurisés
+// MON PORTEFEUILLE - MAN GO (Lisibilité Max, Infobulles, 100% Dynamique)
 // =========================================================================
-
-if (!defined('APP_PATH')) define('APP_PATH', __DIR__);
+ini_set('display_errors', 1); error_reporting(E_ALL);
 require_once __DIR__ . '/config/config.php';
-
-if (defined('SESSION_NAME')) session_name(SESSION_NAME);
-if (session_status() === PHP_SESSION_NONE) session_start();
-
-$baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
-$currentUserId = $_SESSION['user_id'] ?? $_SESSION['user']['id'] ?? null;
-
-if (empty($currentUserId)) {
-    header("Location: $baseUrl/login.php?redirect=my_wallet.php");
-    exit();
-}
-
+require_once __DIR__ . '/core/Autoloader.php';
 require_once __DIR__ . '/core/Database.php';
-require_once __DIR__ . '/core/WalletManager.php';
+require_once __DIR__ . '/core/Session.php';
+
+Session::init();
+$baseUrl = defined('APP_URL') ? APP_URL : '/man_go';
+
+if (!Session::isAuthenticated()) { header("Location: $baseUrl/login.php"); exit(); }
 
 $db = \App\Core\Database::connect();
-$successMessage = '';
-$errorMessage = '';
+$userId = (int)Session::get('user_id');
+$successMsg = $errorMsg = '';
 
-// =========================================================================
-// TRAITEMENT DU TRANSFERT P2P VIA ADRESSE CRYPTO
-// =========================================================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'transfer') {
-    $receiverWalletId = trim($_POST['receiver_wallet_id'] ?? '');
-    $amount = floatval($_POST['amount'] ?? 0);
+// --- RÉCUPÉRATION DE TOUTES LES DONNÉES DYNAMIQUES (ZÉRO VALEUR EN DUR) ---
+$stmtSettings = $db->query("SELECT setting_key, setting_value FROM system_settings WHERE setting_key IN ('transaction_fee', 'rate_usd', 'rate_eur')");
+$settings = $stmtSettings->fetchAll(PDO::FETCH_KEY_PAIR);
 
-    if (empty($receiverWalletId) || $amount < 100) {
-        $errorMessage = "L'adresse du portefeuille ou le montant (min. 100) est invalide.";
-    } else {
-        try {
-            // Lancement du transfert via le nouveau système (qui gère la déduction des 1% de frais)
-            $result = \App\Core\WalletManager::transferCommissionsByWalletId($db, $currentUserId, $receiverWalletId, $amount);
-            
-            $successMessage = "Félicitations ! Vous avez envoyé " . number_format($amount, 0, ',', ' ') . " FCFA. (Frais de réseau : " . $result['fee'] . " FCFA).";
-        } catch (Exception $e) {
-            $errorMessage = $e->getMessage();
+$txFeePercent = isset($settings['transaction_fee']) ? (float)$settings['transaction_fee'] : 2; // 2% par défaut
+$taux_usd = isset($settings['rate_usd']) ? (float)$settings['rate_usd'] : 600; // 600 FCFA par défaut
+$taux_eur = isset($settings['rate_eur']) ? (float)$settings['rate_eur'] : 655; // 655 FCFA par défaut
+
+// --- TRAITEMENT DES FORMULAIRES ---
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    
+    // 1. DEMANDE DE RETRAIT
+    if ($_POST['action'] === 'withdraw_request') {
+        $amountRaw = preg_replace('/[^0-9.]/', '', $_POST['amount_xof'] ?? $_POST['amount'] ?? '0');
+        $amount = (float)$amountRaw;
+        $wallet_destination = trim($_POST['wallet_destination'] ?? '');
+
+        if (!$amount || $amount < 2000) $errorMsg = "Le montant minimum de retrait est de 2 000 FCFA.";
+        elseif (empty($wallet_destination)) $errorMsg = "Veuillez fournir une adresse de réception valide.";
+        else {
+            try {
+                $db->beginTransaction();
+                $stmtUser = $db->prepare("SELECT balance FROM users WHERE id = ? FOR UPDATE");
+                $stmtUser->execute([$userId]);
+                if ($stmtUser->fetchColumn() < $amount) {
+                    $errorMsg = "Solde insuffisant pour ce retrait."; $db->rollBack();
+                } else {
+                    $db->prepare("UPDATE users SET balance = balance - ? WHERE id = ?")->execute([$amount, $userId]);
+                    $db->prepare("INSERT INTO transactions (user_id, amount, payment_method, transaction_ref, status, created_at) VALUES (?, ?, 'withdrawal_request', ?, 'pending', NOW())")->execute([$userId, -$amount, "To: " . $wallet_destination]);
+                    $db->commit();
+                    $successMsg = "Demande enregistrée. Les frais de réseau seront déduits lors de l'envoi.";
+                }
+            } catch (Exception $e) { $db->rollBack(); $errorMsg = "Erreur : " . $e->getMessage(); }
+        }
+    }
+
+    // 2. TRANSFERT ENTRE UTILISATEURS
+    elseif ($_POST['action'] === 'transfer_funds') {
+        $amountRaw = preg_replace('/[^0-9.]/', '', $_POST['transfer_amount_xof'] ?? '0');
+        $amount = (float)$amountRaw;
+        $destination = trim($_POST['transfer_destination'] ?? '');
+        $transferType = $_POST['transfer_type'] ?? 'real';
+
+        if (!$amount || $amount <= 0) {
+            $errorMsg = "Veuillez entrer un montant valide.";
+        } elseif (empty($destination)) {
+            $errorMsg = "Veuillez fournir l'ID MAN GO, l'email ou le numéro du destinataire.";
+        } else {
+            try {
+                $db->beginTransaction();
+                
+                $stmtDest = $db->prepare("SELECT id FROM users WHERE CONCAT('MGO-', UPPER(SUBSTRING(MD5(CONCAT(id, 'mango')), 1, 8))) = ? OR email = ? OR phone = ? LIMIT 1");
+                $stmtDest->execute([$destination, $destination, $destination]);
+                $receiverId = $stmtDest->fetchColumn();
+
+                if (!$receiverId) {
+                    $errorMsg = "Destinataire introuvable. Vérifiez l'ID ou l'email.";
+                    $db->rollBack();
+                } elseif ($receiverId == $userId) {
+                    $errorMsg = "Vous ne pouvez pas vous transférer des fonds à vous-même.";
+                    $db->rollBack();
+                } else {
+                    $stmtUser = $db->prepare("SELECT balance, virtual_credits FROM users WHERE id = ? FOR UPDATE");
+                    $stmtUser->execute([$userId]);
+                    $senderData = $stmtUser->fetch(PDO::FETCH_ASSOC);
+
+                    if ($transferType === 'real') {
+                        // Calcul dynamique des frais de transfert
+                        $feeAmount = $amount * ($txFeePercent / 100);
+                        $totalToDeduct = $amount + $feeAmount;
+
+                        if ($senderData['balance'] < $totalToDeduct) {
+                            $errorMsg = "Solde insuffisant. Prévoyez les frais de $txFeePercent% (" . number_format($feeAmount, 0) . " FCFA).";
+                            $db->rollBack();
+                        } else {
+                            $db->prepare("UPDATE users SET balance = balance - ? WHERE id = ?")->execute([$totalToDeduct, $userId]);
+                            $db->prepare("UPDATE users SET balance = balance + ? WHERE id = ?")->execute([$amount, $receiverId]);
+                            
+                            $db->prepare("INSERT INTO transactions (user_id, amount, payment_method, transaction_ref, status, created_at) VALUES (?, ?, 'transfer_out', ?, 'completed', NOW())")->execute([$userId, -$totalToDeduct, "Transfert vers #$receiverId (Frais: $feeAmount)"]);
+                            $db->prepare("INSERT INTO transactions (user_id, amount, payment_method, transaction_ref, status, created_at) VALUES (?, ?, 'transfer_in', ?, 'completed', NOW())")->execute([$receiverId, $amount, "Reçu de #$userId"]);
+                            
+                            $db->commit();
+                            $successMsg = "Transfert de " . number_format($amount, 0) . " FCFA réussi. Frais appliqués : $feeAmount FCFA.";
+                        }
+                    } else {
+                        // Transfert virtuel
+                        if ($senderData['virtual_credits'] < $amount) {
+                            $errorMsg = "Crédits virtuels insuffisants.";
+                            $db->rollBack();
+                        } else {
+                            $db->prepare("UPDATE users SET virtual_credits = virtual_credits - ? WHERE id = ?")->execute([$amount, $userId]);
+                            $db->prepare("UPDATE users SET virtual_credits = virtual_credits + ? WHERE id = ?")->execute([$amount, $receiverId]);
+                            
+                            $db->prepare("INSERT INTO transactions (user_id, amount, payment_method, transaction_ref, status, created_at) VALUES (?, ?, 'virtual_transfer_out', ?, 'completed', NOW())")->execute([$userId, -$amount, "Crédits envoyés à #$receiverId"]);
+                            $db->prepare("INSERT INTO transactions (user_id, amount, payment_method, transaction_ref, status, created_at) VALUES (?, ?, 'virtual_transfer_in', ?, 'completed', NOW())")->execute([$receiverId, $amount, "Crédits reçus de #$userId"]);
+                            
+                            $db->commit();
+                            $successMsg = "Transfert de " . number_format($amount, 0) . " crédits réussi.";
+                        }
+                    }
+                }
+            } catch (Exception $e) { $db->rollBack(); $errorMsg = "Erreur : " . $e->getMessage(); }
         }
     }
 }
 
-// =========================================================================
-// CHARGEMENT DES DONNÉES DU PORTEFEUILLE
-// =========================================================================
-$wallets = \App\Core\WalletManager::getWallets($db, $currentUserId);
-$creditsBalance = $wallets['credits_balance'];
-$commissionBalance =$wallets['commission_balance'];
-$walletAddress =$wallets['wallet_id']; // Ex: MGO-A1B2C3D4
-
-// Récupérer l'historique complet
-$stmtHistory =$db->prepare("SELECT * FROM wallet_transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 15");
-$stmtHistory->execute([$currentUserId]);
-$transactions =$stmtHistory->fetchAll(PDO::FETCH_ASSOC);
-
-$pageTitle = "Mon Portefeuille - MAN GO";
-?>
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title><?= $pageTitle ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body class="bg-slate-50 text-slate-800 flex flex-col min-h-screen">
-
-<?php 
-$headerPath = __DIR__ . '/app/views/layouts/header.php';
-if (file_exists($headerPath)) require_once$headerPath;
-?>
-
-<main class="flex-1 max-w-6xl mx-auto px-4 py-12 w-full">
+// --- RÉCUPÉRATION DES DONNÉES ---
+$balance = $virtual_credits = 0; $transactions = [];
+try {
+    $stmtUser = $db->prepare("SELECT balance, virtual_credits FROM users WHERE id = ?");
+    $stmtUser->execute([$userId]);
+    $u = $stmtUser->fetch(PDO::FETCH_ASSOC);
+    $balance = $u['balance'] ?? 0; $virtual_credits = $u['virtual_credits'] ?? 0;
     
-    <div class="mb-8">
-        <h1 class="text-3xl font-black text-slate-900">Mon Portefeuille</h1>
-        <p class="text-slate-500 mt-1">Gérez vos crédits, vos revenus et effectuez des transferts hautement sécurisés.</p>
-    </div>
+    $stmtTx = $db->prepare("SELECT * FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 20");
+    $stmtTx->execute([$userId]);
+    $transactions = $stmtTx->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
 
-    <?php if (!empty($successMessage)): ?>
-        <div class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 p-4 rounded-2xl text-sm font-bold flex items-center shadow-sm">
-            <i class="fa-solid fa-circle-check text-xl mr-3"></i> <?= $successMessage ?>
-        </div>
-    <?php endif; ?>
+$mangoPayAddress = "MGO-" . strtoupper(substr(md5($userId . 'mango'), 0, 8));
+$pageTitle = "Mon Portefeuille - MAN GO";
+require_once __DIR__ . '/themes/default/templates/layouts/header.php';
+?>
 
-    <?php if (!empty($errorMessage)): ?>
-        <div class="mb-6 bg-red-50 border border-red-200 text-red-700 p-4 rounded-2xl text-sm font-bold flex items-center shadow-sm">
-            <i class="fa-solid fa-triangle-exclamation text-xl mr-3"></i> <?= $errorMessage ?>
-        </div>
-    <?php endif; ?>
-
-    <!-- LES DEUX CARTES DE SOLDE -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+<div class="bg-slate-50 min-h-screen pt-12 pb-24 font-sans text-slate-800 relative z-0">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6">
         
-        <!-- CARTE 1 : CRÉDITS (Monnaie Virtuelle) -->
-        <div class="bg-slate-900 rounded-3xl p-8 relative overflow-hidden shadow-xl">
-            <div class="absolute -right-10 -top-10 w-40 h-40 bg-amber-500 rounded-full blur-3xl opacity-20"></div>
-            <div class="relative z-10 flex flex-col h-full justify-between">
+        <!-- HEADER & DEVISE -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 border-b border-slate-200 pb-6">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-amber-500/30 transform hover:rotate-6 transition"><i class="fa-solid fa-wallet text-xl"></i></div>
                 <div>
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="bg-amber-500/20 text-amber-400 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider border border-amber-500/30"><i class="fa-solid fa-bolt mr-1"></i> Virtuel</span>
-                        <i class="fa-solid fa-coins text-3xl text-slate-700"></i>
-                    </div>
-                    <p class="text-slate-400 text-sm font-bold">Crédits MAN GO</p>
-                    <h2 class="text-4xl font-black text-white mt-1"><?= number_format($creditsBalance, 0, ',', ' ') ?></h2>
-                    <p class="text-slate-500 text-xs mt-2">Utilisables pour réduire vos factures d'abonnement.</p>
-                </div>
-                <div class="mt-8 flex gap-3">
-                    <a href="<?= $baseUrl ?>/watch_ads.php" class="inline-block bg-slate-800 hover:bg-slate-700 text-amber-400 text-sm font-bold py-3 px-6 rounded-xl transition-colors border border-slate-700">
-                        <i class="fa-solid fa-play mr-2"></i> Gagner des Crédits
-                    </a>
+                    <h1 class="text-2xl font-black text-slate-900 tracking-tight">Mon Portefeuille</h1>
+                    <p class="text-slate-500 text-xs font-medium">Gérez vos revenus en toute sécurité.</p>
                 </div>
             </div>
-        </div>
-
-        <!-- CARTE 2 : COMMISSIONS (Argent Réel) & ADRESSE DE RÉCEPTION -->
-        <div class="bg-gradient-to-br from-emerald-600 to-teal-800 rounded-3xl p-8 relative overflow-hidden shadow-xl shadow-emerald-600/20">
-            <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-white rounded-full blur-3xl opacity-10"></div>
-            <div class="relative z-10 flex flex-col h-full justify-between">
-                <div>
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="bg-white/20 text-white text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider backdrop-blur-sm border border-white/30"><i class="fa-solid fa-money-bill-wave mr-1"></i> Argent Réel</span>
-                        <i class="fa-solid fa-wallet text-3xl text-emerald-800/50"></i>
-                    </div>
-                    <p class="text-emerald-100 text-sm font-bold">Solde Disponible</p>
-                    <h2 class="text-4xl font-black text-white mt-1"><?= number_format($commissionBalance, 0, ',', ' ') ?> <span class="text-xl opacity-80">FCFA</span></h2>
+            <div class="bg-white border border-slate-200 rounded-xl p-1.5 flex items-center shadow-sm relative group cursor-help">
+                <!-- INFOBULLE DEVISE -->
+                <div class="absolute top-full right-0 mt-2 hidden group-hover:block w-48 bg-slate-900 text-white text-[10px] p-2.5 rounded-lg shadow-xl z-50">
+                    Les montants s'affichent dans votre devise, mais les transferts réels se font sur la base du Franc CFA.
                 </div>
                 
-                <!-- BOÎTE DE L'ADRESSE DU PORTEFEUILLE (Comme en Crypto) -->
-                <div class="mt-6 bg-emerald-900/40 rounded-xl p-3 border border-emerald-500/30 flex items-center justify-between backdrop-blur-sm">
-                    <div>
-                        <p class="text-[10px] text-emerald-300 uppercase font-bold tracking-widest mb-1">Votre Adresse MAN GO Pay</p>
-                        <p class="text-white font-mono font-black text-lg tracking-widest" id="walletAddress"><?= $walletAddress ?></p>
-                    </div>
-                    <button type="button" onclick="copyWalletAddress()" class="w-10 h-10 bg-emerald-700/50 hover:bg-emerald-600 text-white rounded-lg transition-colors flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-white">
-                        <i class="fa-solid fa-copy" id="copyIcon"></i>
-                    </button>
-                </div>
-                <p class="text-emerald-200/60 text-[10px] mt-2">Partagez cette adresse chiffrée pour recevoir des paiements en toute sécurité.</p>
+                <span class="text-xs font-bold text-slate-500 px-3 flex items-center gap-2"><i class="fa-solid fa-globe text-amber-500"></i> Devise <i class="fa-solid fa-circle-info text-[10px] text-slate-400"></i></span>
+                <select id="wallet-currency" onchange="convertWalletPrices()" class="bg-slate-100 text-slate-900 text-sm font-black rounded-lg cursor-pointer py-1.5 px-3 border-none outline-none hover:bg-slate-200 transition">
+                    <option value="XOF">XOF (FCFA)</option><option value="USD">USD ($)</option><option value="EUR">EUR (€)</option>
+                </select>
             </div>
         </div>
 
-    </div>
+        <!-- NOTIFICATIONS -->
+        <?php if ($successMsg): ?><div class="bg-emerald-50 text-emerald-800 px-6 py-4 rounded-xl mb-6 font-black text-sm flex items-center shadow-sm border border-emerald-200"><i class="fa-solid fa-circle-check mr-3 text-lg"></i> <?= $successMsg ?></div><?php endif; ?>
+        <?php if ($errorMsg): ?><div class="bg-rose-50 text-rose-800 px-6 py-4 rounded-xl mb-6 font-black text-sm flex items-center shadow-sm border border-rose-200"><i class="fa-solid fa-triangle-exclamation mr-3 text-lg"></i> <?= $errorMsg ?></div><?php endif; ?>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        <!-- SECTION TRANSFERT (1/3) -->
-        <div class="lg:col-span-1 bg-white rounded-3xl border border-slate-200 p-6 shadow-sm h-fit">
-            <div class="flex items-center gap-3 mb-6">
-                <div class="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-lg">
-                    <i class="fa-solid fa-paper-plane"></i>
-                </div>
-                <h3 class="font-black text-slate-800 text-lg">Envoyer des FCFA</h3>
-            </div>
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
             
-            <p class="text-xs text-slate-500 mb-6">Envoyez des fonds de manière instantanée. Le réseau MAN GO prélève <strong class="text-slate-800">1% de frais</strong> sur l'envoi.</p>
-
-            <form action="my_wallet.php" method="POST" class="space-y-5" onsubmit="return confirm('Attention : Les envois via la blockchain MAN GO sont irréversibles. Confirmez-vous cette opération ?');">
-                <input type="hidden" name="action" value="transfer">
-                
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Adresse du Destinataire</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i class="fa-solid fa-link text-slate-400"></i>
+            <!-- COLONNE GAUCHE -->
+            <div class="lg:col-span-5 space-y-6">
+                <!-- CARTE ARGENT -->
+                <div class="bg-slate-900 rounded-3xl p-8 text-white relative overflow-hidden border border-emerald-500/30 shadow-[0_10px_30px_rgba(16,185,129,0.2)] group">
+                    <div class="absolute -right-4 -top-4 p-4 opacity-10 group-hover:scale-110 transition duration-500"><i class="fa-solid fa-sack-dollar text-8xl"></i></div>
+                    <div class="relative z-10">
+                        <span class="bg-gradient-to-r from-emerald-500 to-emerald-400 text-slate-950 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase mb-4 inline-flex items-center"><i class="fa-solid fa-money-bill-wave mr-2"></i> Argent Réel</span>
+                        <p class="text-sm font-bold text-slate-400 mb-1">Solde Disponible</p>
+                        <h2 class="text-4xl sm:text-5xl font-black mb-6 flex items-baseline gap-2 text-white">
+                            <span class="price-element" data-xof="<?= $balance ?>"><?= number_format($balance, 0, ',', ' ') ?></span><span class="currency-symbol text-xl text-emerald-400">FCFA</span>
+                        </h2>
+                        
+                        <!-- INFOBULLE ID MAN GO -->
+                        <div class="relative group/id cursor-help">
+                            <div class="absolute bottom-full left-0 mb-2 hidden group-hover/id:block w-full bg-emerald-900 text-emerald-100 text-[10px] p-2 rounded-lg shadow-xl z-50">
+                                Copiez cet identifiant. C'est votre "Numéro de compte" sur MAN GO pour recevoir des fonds d'autres utilisateurs instantanément.
+                            </div>
+                            <div class="bg-slate-800/80 p-3 rounded-xl border border-slate-700 flex justify-between items-center hover:bg-slate-800 transition" onclick="copyMangoId()">
+                                <div><p class="text-[9px] uppercase tracking-widest text-slate-400 font-black flex items-center gap-1">ID MAN GO PAY <i class="fa-solid fa-circle-info text-slate-500"></i></p><span class="font-mono text-sm font-black text-white" id="mangoIdToCopy"><?= $mangoPayAddress ?></span></div>
+                                <div class="text-emerald-400"><i class="fa-solid fa-copy"></i></div>
+                            </div>
                         </div>
-                        <!-- On demande maintenant l'adresse type MGO-XXXX -->
-                        <input type="text" name="receiver_wallet_id" required placeholder="Ex: MGO-A1B2C3D4" class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition text-sm font-bold uppercase">
                     </div>
                 </div>
 
-                <div>
-                    <label class="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Montant à envoyer (FCFA)</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i class="fa-solid fa-money-bill text-slate-400"></i>
-                        </div>
-                        <input type="number" name="amount" id="transferAmount" required min="100" placeholder="Ex: 5000" class="w-full pl-10 pr-16 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition text-sm font-bold" oninput="calculateFee()">
-                        <div class="absolute inset-y-0 right-0 pr-4 flex items-center pointer-events-none">
-                            <span class="text-slate-400 font-bold text-xs">FCFA</span>
-                        </div>
-                    </div>
-                    <div class="flex justify-between items-center mt-2">
-                        <p class="text-[10px] text-slate-400">Max dispo : <?= number_format($commissionBalance, 0, ',', ' ') ?></p>
-                        <p class="text-[11px] font-bold text-red-500" id="feeDisplay">Frais : 0 FCFA</p>
+                <!-- CARTE VIRTUELLE -->
+                <div class="bg-white rounded-3xl p-6 border border-amber-200 relative overflow-hidden shadow-[0_10px_30px_rgba(245,158,11,0.1)] group">
+                    <div class="absolute -right-4 -bottom-4 p-4 opacity-5 group-hover:scale-110 transition duration-500"><i class="fa-solid fa-bolt text-8xl text-amber-500"></i></div>
+                    <div class="relative z-10">
+                        <span class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase mb-3 inline-flex items-center"><i class="fa-solid fa-bolt mr-1 text-amber-500"></i> Virtuel</span>
+                        <p class="text-xs font-bold text-slate-500 mb-1">Crédits MAN GO</p>
+                        <h2 class="text-3xl font-black mb-4 text-slate-900"><?= number_format($virtual_credits, 0, ',', ' ') ?></h2>
+                        <a href="<?= $baseUrl ?>/watch_ads.php" class="inline-flex items-center bg-slate-900 hover:bg-amber-500 text-white hover:text-slate-900 text-xs font-black py-2.5 px-5 rounded-xl transition"><i class="fa-solid fa-play mr-2"></i> Gagner des crédits</a>
                     </div>
                 </div>
 
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-xl transition text-sm shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2">
-                    Valider le Transfert <i class="fa-solid fa-arrow-right"></i>
-                </button>
-            </form>
-        </div>
-
-        <!-- HISTORIQUE DES TRANSACTIONS (2/3) -->
-        <div class="lg:col-span-2 bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div class="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                <h3 class="font-black text-slate-800 uppercase text-sm tracking-wider"><i class="fa-solid fa-clock-rotate-left text-slate-400 mr-2"></i> Historique des opérations</h3>
-                <span class="text-xs text-slate-500">15 dernières</span>
+                <!-- BOUTONS ACTION -->
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="document.getElementById('depositModal').classList.remove('hidden')" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-4 rounded-xl shadow-[0_5px_15px_rgba(16,185,129,0.3)] transition transform hover:-translate-y-0.5 flex flex-col items-center gap-1"><i class="fa-solid fa-arrow-down text-xl"></i><span class="text-[10px] uppercase tracking-widest">Recharger</span></button>
+                    <button onclick="document.getElementById('withdrawModal').classList.remove('hidden')" class="bg-slate-900 hover:bg-slate-800 text-amber-400 font-black py-4 rounded-xl shadow-[0_5px_15px_rgba(15,23,42,0.3)] transition transform hover:-translate-y-0.5 flex flex-col items-center gap-1"><i class="fa-solid fa-arrow-up text-xl"></i><span class="text-[10px] uppercase tracking-widest text-white">Retirer</span></button>
+                    <button onclick="document.getElementById('transferModal').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-500 text-white font-black py-4 rounded-xl shadow-[0_5px_15px_rgba(37,99,235,0.3)] transition transform hover:-translate-y-0.5 flex flex-col items-center gap-1"><i class="fa-solid fa-paper-plane text-xl"></i><span class="text-[10px] uppercase tracking-widest">Transférer</span></button>
+                </div>
             </div>
-            
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm">
-                    <thead class="bg-white border-b border-slate-100 text-slate-400 text-xs uppercase tracking-wider">
-                        <tr>
-                            <th class="px-6 py-4 font-bold">Date</th>
-                            <th class="px-6 py-4 font-bold">Description</th>
-                            <th class="px-6 py-4 font-bold text-right">Montant</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-50">
-                        <?php if(empty($transactions)): ?>
-                            <tr>
-                                <td colspan="3" class="px-6 py-12 text-center text-slate-400 italic">Aucune transaction pour le moment.</td>
-                            </tr>
+
+            <!-- COLONNE DROITE (HISTORIQUE) -->
+            <div class="lg:col-span-7">
+                <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden h-full flex flex-col">
+                    <div class="p-6 border-b border-slate-200 flex items-center gap-3 bg-slate-50"><div class="w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-clock-rotate-left"></i></div><h3 class="font-black text-lg text-slate-900">Historique</h3></div>
+                    <div class="p-0 flex-1 overflow-y-auto">
+                        <?php if (empty($transactions)): ?>
+                            <div class="text-center py-16 px-4 text-slate-500"><div class="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-200"><i class="fa-solid fa-receipt text-3xl text-slate-300"></i></div><p class="font-black text-slate-700">Aucune transaction.</p></div>
                         <?php else: ?>
-                            <?php foreach($transactions as$tx): ?>
-                                <?php 
-                                    $isCredit = ($tx['type'] === 'credit');
-                                    $isFcfa = ($tx['currency'] === 'commission');
-                                    $amountColor =$isCredit ? 'text-emerald-500' : 'text-slate-700';
-                                    $icon =$isCredit ? 'fa-arrow-down' : 'fa-arrow-up';
-                                    $iconBg =$isCredit ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500';
+                            <ul class="divide-y divide-slate-100">
+                                <?php foreach ($transactions as $tx): 
+                                    $isPositive = $tx['amount'] > 0;
+                                    $sColor = $tx['status'] === 'pending' ? 'text-amber-600 bg-amber-50 border-amber-200' : ($tx['status'] === 'completed' ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : 'text-slate-500 bg-slate-50 border-slate-200');
+                                    $sText = $tx['status'] === 'pending' ? 'En cours' : ($tx['status'] === 'completed' ? 'Terminé' : 'Annulé');
+                                    
+                                    if(str_contains($tx['payment_method'], 'transfer')) $type = "Transfert";
+                                    elseif($tx['payment_method'] === 'crypto_deposit') $type = "Dépôt USDT";
+                                    elseif($tx['payment_method'] === 'withdrawal_request') $type = "Retrait";
+                                    else $type = "Transaction";
                                 ?>
-                                <tr class="hover:bg-slate-50/50 transition group">
-                                    <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-500">
-                                        <?= date('d/m/Y', strtotime($tx['created_at'])) ?><br>
-                                        <span class="text-[10px]"><?= date('H:i', strtotime($tx['created_at'])) ?></span>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center gap-3">
-                                            <div class="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 <?= $iconBg ?>">
-                                                <i class="fa-solid <?= $icon ?> text-xs"></i>
-                                            </div>
+                                    <li class="p-4 sm:p-5 hover:bg-slate-50 transition flex items-center justify-between gap-3 group">
+                                        <div class="flex items-center gap-4">
+                                            <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 border <?= $isPositive ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200' ?>"><i class="fa-solid <?= $isPositive ? 'fa-arrow-down' : 'fa-arrow-up' ?>"></i></div>
                                             <div>
-                                                <p class="font-bold text-slate-800 text-sm group-hover:text-blue-600 transition-colors"><?= htmlspecialchars($tx['description']) ?></p>
-                                                <p class="text-[10px] uppercase font-bold tracking-wider <?= $isFcfa ? 'text-emerald-600' : 'text-amber-500' ?>">
-                                                    Portefeuille <?= $isFcfa ? 'Commissions (FCFA)' : 'Crédits Virtuels' ?>
-                                                </p>
+                                                <p class="font-black text-slate-900 text-sm"><?= $type ?></p>
+                                                <div class="flex items-center gap-2 mt-1"><span class="text-[10px] font-bold text-slate-500"><?= date('d/m/y H:i', strtotime($tx['created_at'])) ?></span><span class="text-[8px] font-black uppercase px-1.5 py-0.5 rounded border <?= $sColor ?>"><?= $sText ?></span></div>
                                             </div>
                                         </div>
-                                    </td>
-                                    <td class="px-6 py-4 whitespace-nowrap text-right">
-                                        <span class="font-black text-base <?= $amountColor ?>">
-                                            <?= $isCredit ? '+' : '-' ?><?= number_format($tx['amount'], 0, ',', ' ') ?>
-                                        </span>
-                                        <span class="text-xs font-bold text-slate-400 ml-1">
-                                            <?= $isFcfa ? 'FCFA' : 'Crédits' ?>
-                                        </span>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
+                                        <div class="text-right">
+                                            <span class="font-black text-base flex items-baseline gap-1 <?= $isPositive ? 'text-emerald-600' : 'text-slate-900' ?>"><?= $isPositive ? '+' : '' ?><span class="price-element" data-xof="<?= abs($tx['amount']) ?>"><?= number_format(abs($tx['amount']), 0, ',', ' ') ?></span><span class="<?= str_contains($tx['payment_method'], 'virtual') ? '' : 'currency-symbol' ?> text-[9px] text-slate-400"><?= str_contains($tx['payment_method'], 'virtual') ? 'Crédits' : 'FCFA' ?></span></span>
+                                        </div>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ul>
                         <?php endif; ?>
-                    </tbody>
-                </table>
+                    </div>
+                </div>
             </div>
         </div>
-
     </div>
+</div>
 
-</main>
+<!-- ================= MODALES (SÉCURISÉES & ÉQUITABLES) ================= -->
+
+<!-- DÉPÔT -->
+<div id="depositModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl overflow-hidden max-w-md w-full shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center"><h4 class="font-black text-lg text-slate-900 flex items-center gap-2"><i class="fa-solid fa-arrow-down text-emerald-500"></i> Recharger</h4><button onclick="document.getElementById('depositModal').classList.add('hidden')" class="text-slate-400 hover:text-rose-500 text-xl">&times;</button></div>
+        <div class="p-6">
+            <p class="text-xs font-bold text-slate-500 mb-3 text-center">Acheter des USDT via nos partenaires :</p>
+            <div class="flex justify-center gap-2 mb-6">
+                <a href="https://home.izichange.com/sign-up?ref=e8b1428b-982a-11f0-aaad-06c2f6bc7eb9" target="_blank" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-center hover:border-emerald-500 hover:shadow-sm transition group"><i class="fa-solid fa-bolt text-xl text-emerald-500 mb-1 group-hover:scale-110 transition"></i><span class="block text-[9px] font-black uppercase text-slate-700">Izichange</span></a>
+                <a href="https://perfectmoney.com/" target="_blank" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-center hover:border-red-500 hover:shadow-sm transition group"><i class="fa-solid fa-p text-xl text-red-500 font-serif mb-1 group-hover:scale-110 transition"></i><span class="block text-[9px] font-black uppercase text-slate-700">P. Money</span></a>
+                <a href="https://p2p.binance.com/" target="_blank" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl p-3 text-center hover:border-yellow-500 hover:shadow-sm transition group"><i class="fa-brands fa-binance text-xl text-yellow-500 mb-1 group-hover:scale-110 transition"></i><span class="block text-[9px] font-black uppercase text-slate-700">Binance</span></a>
+            </div>
+            <form action="/man_go/process_payment.php" method="GET" id="depositForm">
+                <input type="hidden" name="deposit" id="deposit_amount_xof" value="">
+                <label class="block text-[10px] font-black text-slate-700 uppercase tracking-widest mb-2">Montant (<span class="currency-label">FCFA</span>) *</label>
+                <div class="relative mb-5">
+                    <input type="text" inputmode="numeric" id="deposit_amount_display" placeholder="Ex: 5000" required oninput="this.value = this.value.replace(/[^0-9.]/g, ''); updateHiddenAmount(this.value, 'deposit_amount_xof');" class="w-full bg-white border-2 border-slate-300 text-slate-900 rounded-xl p-4 pr-16 text-xl font-black outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 placeholder-slate-400">
+                    <span class="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 font-black currency-symbol">FCFA</span>
+                </div>
+                <button type="submit" class="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase rounded-xl transition shadow-md">Générer l'adresse <i class="fa-solid fa-arrow-right ml-1"></i></button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- RETRAIT -->
+<div id="withdrawModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl overflow-hidden max-w-md w-full shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center"><h4 class="font-black text-lg text-slate-900 flex items-center gap-2"><i class="fa-solid fa-arrow-up text-amber-500"></i> Retirer</h4><button onclick="document.getElementById('withdrawModal').classList.add('hidden')" class="text-slate-400 hover:text-rose-500 text-xl">&times;</button></div>
+        <div class="p-6">
+            <div class="bg-amber-50 p-4 rounded-xl border border-amber-300 mb-5 flex gap-3 shadow-inner">
+                <i class="fa-solid fa-shield-halved text-amber-500 text-2xl"></i>
+                <div>
+                    <h5 class="font-black text-amber-900 text-xs uppercase mb-1">Sécurité & Frais</h5>
+                    <p class="text-[11px] text-amber-800 font-medium leading-relaxed">Retrait manuel garanti sous 1 à 24h. <strong>Les frais de réseau</strong> seront déduits lors de l'envoi.</p>
+                </div>
+            </div>
+            <form method="POST" action="my_wallet.php" id="withdrawForm">
+                <input type="hidden" name="action" value="withdraw_request">
+                <input type="hidden" name="amount_xof" id="withdraw_amount_xof" value="">
+                <div class="mb-4">
+                    <label class="block text-[10px] font-black text-slate-700 uppercase tracking-widest mb-2 flex justify-between"><span>Montant (<span class="currency-label">FCFA</span>) *</span><span class="text-emerald-600 font-bold">Max: <span class="price-element" data-xof="<?= $balance ?>"><?= number_format($balance, 0, ',', ' ') ?></span> <span class="currency-symbol">FCFA</span></span></label>
+                    <div class="relative">
+                        <input type="text" inputmode="numeric" id="withdraw_amount_display" placeholder="Ex: 15000" required oninput="this.value = this.value.replace(/[^0-9.]/g, ''); updateHiddenAmount(this.value, 'withdraw_amount_xof');" class="w-full bg-white border-2 border-slate-300 text-slate-900 rounded-xl p-4 pr-16 text-xl font-black outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 placeholder-slate-400">
+                        <span class="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 font-black currency-symbol">FCFA</span>
+                    </div>
+                </div>
+                <div class="mb-6">
+                    <!-- INFOBULLE DESTINATAIRE -->
+                    <label class="block text-[10px] font-black text-slate-700 uppercase tracking-widest mb-2 flex items-center gap-1 group relative cursor-help w-max">
+                        Adresse de destination * <i class="fa-solid fa-circle-info text-blue-500"></i>
+                        <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-48 bg-slate-800 text-white text-[10px] p-2.5 rounded-lg shadow-xl z-50 normal-case font-medium">
+                            Entrez votre adresse cryptomonnaie (USDT TRC20) ou votre numéro de compte Mobile Money (T-Money, Flooz).
+                        </div>
+                    </label>
+                    <input type="text" name="wallet_destination" placeholder="Adresse USDT ou N° T-Money/Flooz" required class="w-full bg-white border-2 border-slate-300 text-slate-900 rounded-xl p-4 text-sm font-bold outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 placeholder-slate-400">
+                </div>
+                <button type="submit" class="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase rounded-xl transition shadow-md">Confirmer la demande</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- TRANSFERT -->
+<div id="transferModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl overflow-hidden max-w-md w-full shadow-2xl border border-slate-200">
+        <div class="p-5 border-b border-slate-200 flex justify-between items-center"><h4 class="font-black text-lg text-slate-900 flex items-center gap-2"><i class="fa-solid fa-paper-plane text-blue-600"></i> Transférer</h4><button onclick="document.getElementById('transferModal').classList.add('hidden')" class="text-slate-400 hover:text-rose-500 text-xl">&times;</button></div>
+        <div class="p-6">
+            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 mb-5 flex gap-3 shadow-inner">
+                <i class="fa-solid fa-circle-info text-blue-500 text-2xl"></i>
+                <div>
+                    <h5 class="font-black text-blue-900 text-xs uppercase mb-1">Envoi instantané</h5>
+                    <p class="text-[11px] text-blue-800 font-medium leading-relaxed">Transférez des fonds à un autre utilisateur. <strong class="text-rose-600">Frais MAN GO : <?= $txFeePercent ?>%</strong> sur l'argent réel.</p>
+                </div>
+            </div>
+            <form method="POST" action="my_wallet.php" id="transferForm">
+                <input type="hidden" name="action" value="transfer_funds">
+                <input type="hidden" name="transfer_amount_xof" id="transfer_amount_xof" value="">
+                
+                <div class="mb-4">
+                    <!-- INFOBULLE TYPE DE FONDS -->
+                    <label class="block text-[10px] font-black text-slate-700 uppercase tracking-widest mb-2 flex items-center gap-1 group relative cursor-help w-max">
+                        Type de fonds <i class="fa-solid fa-circle-info text-blue-500"></i>
+                        <div class="absolute bottom-full left-0 mb-2 hidden group-hover:block w-56 bg-slate-800 text-white text-[10px] p-2.5 rounded-lg shadow-xl z-50 normal-case font-medium">
+                            L'envoi de crédits virtuels est gratuit. L'envoi d'argent réel applique une déduction supplémentaire de <?= $txFeePercent ?>% sur votre solde pour les frais MAN GO.
+                        </div>
+                    </label>
+                    <select name="transfer_type" class="w-full bg-white border-2 border-slate-300 text-slate-900 rounded-xl p-3 text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 cursor-pointer">
+                        <option value="real">Argent Réel (Frais <?= $txFeePercent ?>%)</option>
+                        <option value="virtual">Crédits Virtuels (Sans frais)</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-[10px] font-black text-slate-700 uppercase tracking-widest mb-2">Montant à envoyer *</label>
+                    <div class="relative">
+                        <input type="text" inputmode="numeric" id="transfer_amount_display" placeholder="Ex: 2000" required oninput="this.value = this.value.replace(/[^0-9.]/g, ''); updateHiddenAmount(this.value, 'transfer_amount_xof');" class="w-full bg-white border-2 border-slate-300 text-slate-900 rounded-xl p-4 pr-16 text-xl font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder-slate-400">
+                        <span class="absolute right-5 top-1/2 -translate-y-1/2 text-slate-500 font-black currency-symbol">FCFA</span>
+                    </div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-[10px] font-black text-slate-700 uppercase tracking-widest mb-2">Destinataire *</label>
+                    <input type="text" name="transfer_destination" placeholder="ID MAN GO (ex: MGO-A1B2C3D4), Email ou Tél" required class="w-full bg-white border-2 border-slate-300 text-slate-900 rounded-xl p-4 text-sm font-bold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 placeholder-slate-400">
+                </div>
+                <button type="submit" class="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-black text-xs uppercase rounded-xl transition shadow-md">Envoyer les fonds</button>
+            </form>
+        </div>
+    </div>
+</div>
 
 <script>
-    // 1. Fonction pour copier l'adresse du portefeuille
-    function copyWalletAddress() {
-        const address = document.getElementById('walletAddress').innerText;
-        navigator.clipboard.writeText(address).then(() => {
-            const icon = document.getElementById('copyIcon');
-            icon.className = "fa-solid fa-check text-white"; // Change l'icône en coche
-            setTimeout(() => { icon.className = "fa-solid fa-copy"; }, 2000); // Remet l'icône normale
-        }).catch(err => {
-            alert('Erreur lors de la copie');
-        });
-    }
+// Les variables sont maintenant récupérées depuis la Base de Données via PHP !
+const rateUSD = <?= $taux_usd ?>;
+const rateEUR = <?= $taux_eur ?>;
 
-    // 2. Calcul dynamique des frais de 1% (Min 5 FCFA)
-    function calculateFee() {
-        const amountInput = document.getElementById('transferAmount').value;
-        const amount = parseFloat(amountInput);
-        const feeDisplay = document.getElementById('feeDisplay');
-        
-        if (isNaN(amount) || amount < 100) {
-            feeDisplay.innerText = "Frais : 0 FCFA";
-            feeDisplay.className = "text-[11px] font-bold text-slate-400";
-        } else {
-            let fee = Math.ceil((amount * 1) / 100);
-            if (fee < 5) fee = 5; // Minimum 5 FCFA
-            feeDisplay.innerText = `Frais de réseau : -${fee} FCFA`;
-            feeDisplay.className = "text-[11px] font-black text-red-500";
+function updateHiddenAmount(displayValue, hiddenInputId) {
+    let amt = parseFloat(displayValue);
+    if (isNaN(amt)) amt = 0;
+    const currency = document.getElementById('wallet-currency').value;
+    let xofAmount = amt;
+    if (currency === 'USD') xofAmount = amt * rateUSD;
+    else if (currency === 'EUR') xofAmount = amt * rateEUR;
+    document.getElementById(hiddenInputId).value = Math.round(xofAmount);
+}
+
+function convertWalletPrices() {
+    const currency = document.getElementById('wallet-currency').value;
+    document.querySelectorAll('.currency-symbol').forEach(sym => { sym.innerText = currency === 'XOF' ? 'FCFA' : currency; });
+    document.querySelectorAll('.currency-label').forEach(lbl => { lbl.innerText = currency === 'XOF' ? 'FCFA' : currency; });
+    
+    const depInput = document.getElementById('deposit_amount_display');
+    const withInput = document.getElementById('withdraw_amount_display');
+    const transInput = document.getElementById('transfer_amount_display');
+    
+    if(currency === 'XOF') { depInput.placeholder = "Ex: 5000"; withInput.placeholder = "Ex: 15000"; transInput.placeholder = "Ex: 2000"; }
+    else { depInput.placeholder = "Ex: 10"; withInput.placeholder = "Ex: 25"; transInput.placeholder = "Ex: 5"; }
+
+    document.querySelectorAll('.price-element').forEach(el => {
+        let amt = parseFloat(el.getAttribute('data-xof')), dec = 0;
+        if (currency === 'USD') { amt /= rateUSD; dec = 2; } 
+        else if (currency === 'EUR') { amt /= rateEUR; dec = 2; }
+        el.innerText = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(amt);
+    });
+    
+    [ {disp: depInput, hid: 'deposit_amount_xof'}, {disp: withInput, hid: 'withdraw_amount_xof'}, {disp: transInput, hid: 'transfer_amount_xof'} ].forEach(inp => {
+        if(inp.disp && inp.disp.value) {
+            let xofVal = parseFloat(document.getElementById(inp.hid).value || 0);
+            if(currency === 'USD') inp.disp.value = (xofVal / rateUSD).toFixed(2);
+            else if(currency === 'EUR') inp.disp.value = (xofVal / rateEUR).toFixed(2);
+            else inp.disp.value = xofVal;
         }
-    }
+    });
+}
+function copyMangoId() { navigator.clipboard.writeText(document.getElementById('mangoIdToCopy').innerText); alert("ID MAN GO PAY copié !"); }
 </script>
-</body>
-</html>
+
+<?php require_once __DIR__ . '/themes/default/templates/layouts/footer.php'; ?>
