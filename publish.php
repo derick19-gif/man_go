@@ -9,6 +9,7 @@ if (!defined('APP_PATH')) {
 
 // NE SURTOUT PAS SUPPRIMER CETTE LIGNE :
 require_once __DIR__ . '/config/config.php';
+require_once __DIR__ . '/core/Database.php';
 
 if (defined('SESSION_NAME')) session_name(SESSION_NAME);
 if (session_status() === PHP_SESSION_NONE) {
@@ -30,14 +31,17 @@ if (!in_array($userRole, ['vendor', 'vendeur', '4'])) {
     exit();
 }
 
-require_once __DIR__ . '/core/Database.php';
 $db = \App\Core\Database::connect();
 $successMessage = ""; $errorMessage = "";
 
-// Vérification du statut Premium du vendeur
+// =====================================================================
+// VÉRIFICATION DE L'ABONNEMENT (Version Modulaire Simplifiée)
+// =====================================================================
 $stmtUser = $db->prepare("SELECT is_premium FROM users WHERE id = :id");
 $stmtUser->execute([':id' => $_SESSION['user_id']]);
 $userObj = $stmtUser->fetch(PDO::FETCH_ASSOC);
+
+// On utilise uniquement cette variable pour débloquer les fonctionnalités
 $isPremium = !empty($userObj['is_premium']) ? (bool)$userObj['is_premium'] : false;
 
 // =========================================================================
@@ -60,8 +64,9 @@ try {
             $categoriesTree[$cat['parent_id']]['subcategories'][] = $cat;
         }
     }
-    usort($categoriesTree, function($a, $b) { return strcmp($a['name'], $b['name']); });
-} catch (PDOException $e) {}
+    usort($categoriesTree, function($a, $b) { return strcmp($a['name'],$b['name']); });
+} catch (PDOException $e) {$errorMessage = "Erreur lors du chargement des catégories.";
+}
 
 
 // Mode Édition
@@ -70,37 +75,34 @@ $listingId = $_GET['id'] ?? $_POST['listing_id'] ?? null;
 $existingData = [];
 
 if ($listingId) {
-    $stmtEdit = $db->prepare("SELECT * FROM listings WHERE id = :id AND user_id = :uid LIMIT 1");
-    $stmtEdit->execute([':id' => $listingId, ':uid' => $_SESSION['user_id']]);
-    $existingData = $stmtEdit->fetch(PDO::FETCH_ASSOC);
-    if ($existingData) $editMode = true;
+    $stmtEdit =$db->prepare("SELECT * FROM listings WHERE id = :id AND user_id = :uid LIMIT 1");
+    $stmtEdit->execute([':id' => $listingId, ':uid' =>$_SESSION['user_id']]);
+    $existingData =$stmtEdit->fetch(PDO::FETCH_ASSOC);
+    if ($existingData)$editMode = true;
 }
 
+// =========================================================================
+// SOUMISSION DU FORMULAIRE DE PUBLICATION / ÉDITION
+// =========================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        $stmtStand = $db->prepare("SELECT id FROM stands WHERE user_id = :user_id AND status = 'active' LIMIT 1");
-        $stmtStand->execute([':user_id' => $_SESSION['user_id']]);
-        $stand = $stmtStand->fetch(PDO::FETCH_ASSOC);
+        $stmtStand =$db->prepare("SELECT id FROM stands WHERE user_id = :user_id AND status = 'active' LIMIT 1");
+        $stmtStand->execute([':user_id' =>$_SESSION['user_id']]);
+        $stand =$stmtStand->fetch(PDO::FETCH_ASSOC);
         
-        if (!$stand) {
-            $errorMessage = "Opération refusée : Vous devez d'abord créer et activer votre Stand Officiel.";
+        if (!$stand) {$errorMessage = "Opération refusée : Vous devez d'abord créer et activer votre Stand Officiel.";
         } else {
-            $standId = $stand['id'];
-            $title = trim($_POST['title'] ?? '');
-            $categoryId = intval($_POST['category_id'] ?? 0);
-            $price = floatval($_POST['price'] ?? 0);
-            $originalPrice = !empty($_POST['original_price']) ? floatval($_POST['original_price']) : null;
+            $standId = $stand['id'];$title = trim($_POST['title'] ?? '');$categoryId = intval($_POST['category_id'] ?? 0);$price = floatval($_POST['price'] ?? 0);$originalPrice = !empty($_POST['original_price']) ? floatval($_POST['original_price']) : null;
             $description = trim($_POST['description'] ?? '');
             $webLink = trim($_POST['web_link'] ?? '');
             $slug = strtolower(trim(preg_replace('/[^A-Za-z0-9-]+/', '-',$title), '-'));
 
             // LOGIQUE DE PROGRAMMATION PREMIUM
             $scheduledAt = null;
-            $status = 'active'; 
+            $status = 'active'; // Par défaut, l'annonce est publiée et visible dans l'Admin
             if ($isPremium && !empty($_POST['scheduled_at'])) {
-                $scheduledAt = $_POST['scheduled_at'];
-                if (strtotime($scheduledAt) > time()) {
-                    $status = 'scheduled'; 
+                $scheduledAt =$_POST['scheduled_at'];
+                if (strtotime($scheduledAt) > time()) {$status = 'scheduled'; 
                 }
             }
 
@@ -108,11 +110,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $mainImagePath = $editMode ? $existingData['image_path'] : null;
             $uploadedImages = [];
             
-            if (!empty($_FILES['images']['name'][0])) {
-                $uploadDir = __DIR__ . '/public/uploads/listings/';
+            if (!empty($_FILES['images']['name'][0])) {$uploadDir = __DIR__ . '/public/uploads/listings/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0777, true);
                 
-                foreach ($_FILES['images']['name'] as $key => $name) {
+                foreach ($_FILES['images']['name'] as $key =>$name) {
                     if ($_FILES['images']['error'][$key] === UPLOAD_ERR_OK) {
                         $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
                         if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) {
@@ -165,7 +166,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
         }
-    } catch (PDOException $e) {$errorMessage = "Erreur SQL : " . $e->getMessage(); }
+    } catch (PDOException $e) {$errorMessage = "Erreur lors de l'enregistrement de l'annonce."; 
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -208,7 +210,7 @@ if (file_exists($headerPath)) require_once$headerPath;
         </div>
     <?php endif; ?>
 
-    <form action="publish.php" method="POST" enctype="multipart/form-data" class="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6">
+    <form action="publish.php<?= $editMode ? '?id=' . $listingId : '' ?>" method="POST" enctype="multipart/form-data" class="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm space-y-6">
         <?php if($editMode): ?><input type="hidden" name="listing_id" value="<?= $listingId ?>"><?php endif; ?>
 
         <div>
@@ -252,8 +254,8 @@ if (file_exists($headerPath)) require_once$headerPath;
         </div>
 
         <!-- MODULE DE PROGRAMMATION (PREMIUM) -->
-        <div class="p-5 border <?= $isPremium ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50 opacity-80' ?> rounded-2xl">
-            <div class="flex items-center justify-between mb-3">
+        <div class="p-5 border <?= $isPremium ? 'border-amber-400 bg-amber-50' : 'border-gray-200 bg-gray-50 opacity-80' ?> rounded-2xl relative overflow-hidden group">
+            <div class="flex items-center justify-between mb-3 relative z-10">
                 <label class="block text-xs font-bold text-slate-900 uppercase">
                     <i class="fa-solid fa-clock text-amber-500 mr-2"></i> Programmation de l'annonce
                 </label>
@@ -261,9 +263,13 @@ if (file_exists($headerPath)) require_once$headerPath;
                     <span class="bg-slate-900 text-white text-[10px] px-2 py-1 rounded font-bold uppercase"><i class="fa-solid fa-lock text-amber-500 mr-1"></i> Premium</span>
                 <?php endif; ?>
             </div>
-            <input type="datetime-local" name="scheduled_at" value="<?= htmlspecialchars($existingData['scheduled_at'] ?? '') ?>" <?= $isPremium ? '' : 'disabled' ?> class="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm">
+            <input type="datetime-local" name="scheduled_at" value="<?= htmlspecialchars($existingData['scheduled_at'] ?? '') ?>" <?= $isPremium ? '' : 'disabled' ?> class="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm relative z-10">
+            
             <?php if (!$isPremium): ?>
-                <p class="text-xs text-slate-500 mt-2 font-medium">Abonnez-vous au forfait Premium pour programmer vos annonces à une date ultérieure.</p>
+                <div class="absolute inset-0 bg-slate-100/50 backdrop-blur-[1px] z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition duration-300">
+                    <a href="<?= $baseUrl ?>/pricing.php" class="bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-xl shadow-lg border border-slate-700">Débloquer cette fonction</a>
+                </div>
+                <p class="text-xs text-slate-500 mt-2 font-medium relative z-10">Abonnez-vous au forfait Premium pour programmer vos annonces à une date ultérieure.</p>
             <?php endif; ?>
         </div>
 
@@ -283,6 +289,7 @@ if (file_exists($headerPath)) require_once$headerPath;
         </button>
     </form>
 </main>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const fileInput = document.getElementById('imagesInput');
@@ -310,6 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
             reader.readAsDataURL(files[i]);
         }
     }
+    
     window.removeFile = function(index) {
         const dt = new DataTransfer();
         const files = selectedFiles.files;

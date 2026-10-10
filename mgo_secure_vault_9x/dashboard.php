@@ -120,7 +120,11 @@ try { $countReports = $db->query("SELECT COUNT(*) FROM reports WHERE status = 'p
                     <?php if ($countPendingKyc > 0): ?><span class="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse"><?= $countPendingKyc ?></span><?php endif; ?>
                 </a>
                 <p class="px-3 text-[10px] font-black text-slate-500 uppercase tracking-widest mt-6 mb-2">Communauté & Finance</p>
+                <a href="?page=deposits" class="flex items-center justify-between px-4 py-3 rounded-xl transition <?= $currentPage === 'deposits' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white' ?>">
+                    <div class="flex items-center font-bold text-sm"><i class="fa-brands fa-bitcoin w-6 text-center"></i> Dépôts Crypto</div>
+                </a>
                 <a href="?page=users" class="flex items-center px-4 py-3 rounded-xl transition <?= $currentPage === 'users' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white' ?>"><i class="fa-solid fa-users w-6 text-center"></i> <span class="font-bold text-sm">Utilisateurs</span></a>
+                <a href="?page=listings" class="flex items-center px-4 py-3 rounded-xl transition <?= $currentPage === 'listings' ? 'bg-amber-500/10 text-amber-500 border border-amber-500/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white' ?>"><i class="fa-solid fa-boxes-stacked w-6 text-center"></i> <span class="font-bold text-sm">Catalogue / Annonces</span></a>
                 <a href="?page=reports" class="flex items-center justify-between px-4 py-3 rounded-xl transition <?= $currentPage === 'reports' ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' : 'text-slate-400 hover:bg-slate-800 hover:text-white' ?>">
                     <div class="flex items-center font-bold text-sm"><i class="fa-solid fa-triangle-exclamation w-6 text-center"></i> Signalements</div>
                     <?php if ($countReports > 0): ?><span class="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse"><?= $countReports ?></span><?php endif; ?>
@@ -141,13 +145,14 @@ try { $countReports = $db->query("SELECT COUNT(*) FROM reports WHERE status = 'p
 
         <?php
         // LE ROUTEUR : Charge dynamiquement le bon fichier depuis le dossier "pages"
-        $allowedPages = ['home', 'kyc', 'users', 'settings', 'reports'];
+        // AJOUT DE 'listings' DANS LA LISTE BLANCHE !
+        $allowedPages = ['home', 'kyc', 'users', 'settings', 'reports', 'listings', 'deposits'];
         $pageFile = __DIR__ . "/pages/{$currentPage}.php";
         
         if (in_array($currentPage, $allowedPages) && file_exists($pageFile)) {
             require_once $pageFile;
         } else {
-            echo "<div class='text-center py-20'><i class='fa-solid fa-triangle-exclamation text-4xl text-rose-500 mb-4'></i><h2 class='text-2xl font-black text-white'>Module introuvable</h2><p class='text-slate-500'>Veuillez créer le fichier pages/{$currentPage}.php</p></div>";
+            echo "<div class='text-center py-20'><i class='fa-solid fa-triangle-exclamation text-4xl text-rose-500 mb-4'></i><h2 class='text-2xl font-black text-white'>Module introuvable</h2><p class='text-slate-500'>Veuillez créer le fichier pages/{$currentPage}.php et l'ajouter au tableau allowedPages.</p></div>";
         }
         ?>
     </main>

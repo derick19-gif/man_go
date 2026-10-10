@@ -1,5 +1,7 @@
 <?php
+// =========================================================================
 // chat.php (Interface de Messagerie MAN GO Shield)
+// =========================================================================
 require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/core/Autoloader.php';
 require_once __DIR__ . '/core/Database.php';
@@ -19,21 +21,19 @@ $userRole = Session::get('user_role');
 
 // Redirection sécurisée
 $returnUrl = $baseUrl . '/client/views/dashboard.php';
-if (in_array($userRole, ['vendor', 'vendeur'])) { $returnUrl = $baseUrl . '/vendor_dir/dashboard.php'; }
-if ($userRole === 'admin') { $returnUrl = $baseUrl . '/admin/dashboard.php'; }
+if (in_array($userRole, ['vendor', 'vendeur', '4'])) { $returnUrl = $baseUrl . '/vendor_dir/dashboard.php'; }
+if ($userRole === 'admin' || $userRole === '1') { $returnUrl = $baseUrl . '/mgo_secure_vault_9x/dashboard.php'; }
 
-// Récupérer le vrai nom du destinataire
+// Récupérer le vrai nom du destinataire (Pour le premier chargement)
 $target_name = "Utilisateur";
 if ($vendor_id !== null) {
     try {
         $db_chat = \App\Core\Database::connect();
         $stmtUser = $db_chat->prepare("SELECT firstname, lastname FROM users WHERE id = ?");
         $stmtUser->execute([$vendor_id]);
-        $uData = $stmtUser->fetch(PDO::FETCH_ASSOC);
-        if ($uData) {
-            $fName = isset($uData['firstname']) ? $uData['firstname'] : '';
-            $lName = isset($uData['lastname']) ? $uData['lastname'] : '';
-            $target_name = trim($fName . ' ' . $lName);
+        $uData =$stmtUser->fetch(PDO::FETCH_ASSOC);
+        if ($uData) {$fName = isset($uData['firstname']) ?$uData['firstname'] : '';
+            $lName = isset($uData['lastname']) ? $uData['lastname'] : '';$target_name = trim($fName . ' ' .$lName);
             if ($target_name === '') { $target_name = 'Utilisateur #' . $vendor_id; }
         }
     } catch(Exception $e) {}
@@ -43,7 +43,7 @@ if ($vendor_id !== null) {
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>MAN GO Shield - Messagerie Pro</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -51,35 +51,50 @@ if ($vendor_id !== null) {
         :root { --mango-orange: #f59e0b; --mango-dark: #0f172a; --chat-bg: #f8fafc; }
         body { background-color: #f1f5f9; height: 100vh; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
         .chat-container { height: calc(100vh - 40px); margin-top: 20px; background: #ffffff; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); overflow: hidden; border: 1px solid #e2e8f0; }
-        .inbox-sidebar { border-right: 1px solid #e2e8f0; height: 100%; display: flex; flex-direction: column; background: #fff; }
+        
+        /* SIDEBAR (Inbox) */
+        .inbox-sidebar { border-right: 1px solid #e2e8f0; height: 100%; display: flex; flex-direction: column; background: #fff; z-index: 20; }
         .inbox-header { padding: 20px; background-color: #fff; border-bottom: 1px solid #f1f5f9; }
         .inbox-list { flex: 1; overflow-y: auto; }
+        
         .conversation-item { padding: 16px 20px; border-bottom: 1px solid #f8fafc; cursor: pointer; transition: background 0.2s; position: relative; }
         .conversation-item:hover { background-color: #f8fafc; }
         .conversation-item.active { background-color: #fffbeb; border-left: 4px solid var(--mango-orange); }
         .avatar-circle { width: 48px; height: 48px; border-radius: 50%; background-color: var(--mango-dark); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; }
-        .chat-main { height: 100%; display: flex; flex-direction: column; background-image: url('https://www.transparenttextures.com/patterns/cubes.png'); background-color: var(--chat-bg); }
+        
+        /* MENU OPTIONS CONVERSATION (Les 3 petits points) */
+        .conv-options-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; padding: 10px; border-radius: 50%; transition: all 0.2s; z-index: 5; }
+        .conv-options-btn:hover { background: #f1f5f9; color: var(--mango-dark); }
+        .conv-dropdown-menu { border-radius: 12px; border: none; box-shadow: 0 10px 25px rgba(0,0,0,0.1); overflow: hidden; }
+        .conv-dropdown-item { padding: 10px 16px; font-weight: 600; font-size: 0.85rem; display: flex; align-items: center; gap: 10px; }
+        .conv-dropdown-item:hover { background-color: #f8fafc; }
+        .conv-dropdown-item.danger { color: #ef4444; }
+        .conv-dropdown-item.danger:hover { background-color: #fef2f2; }
+
+        /* MAIN CHAT */
+        .chat-main { height: 100%; display: flex; flex-direction: column; background-image: url('https://www.transparenttextures.com/patterns/cubes.png'); background-color: var(--chat-bg); position: relative; z-index: 10; }
         .chat-header { padding: 16px 24px; background: #ffffff; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.02); z-index: 10; }
         .chat-messages { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
-        .message-bubble { max-width: 75%; padding: 12px 16px; border-radius: 16px; font-size: 0.95rem; position: relative; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        
+        .message-bubble { max-width: 75%; padding: 12px 16px; border-radius: 16px; font-size: 1rem; font-weight: 500; position: relative; word-wrap: break-word; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .message-sent { align-self: flex-end; background-color: var(--mango-dark); color: #ffffff; border-bottom-right-radius: 4px; }
-        .message-received { align-self: flex-start; background-color: #ffffff; color: #1e293b; border: 1px solid #e2e8f0; border-bottom-left-radius: 4px; }
-        .message-time { font-size: 0.7rem; margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-        .message-sent .message-time { color: rgba(255,255,255,0.7); }
+        .message-received { align-self: flex-start; background-color: #ffffff; color: #0f172a; border: 1px solid #cbd5e1; border-bottom-left-radius: 4px; }
+        
+        .message-time { font-size: 0.75rem; margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-weight: bold; }
+        .message-sent .message-time { color: rgba(255,255,255,0.8); }
         .message-received .message-time { color: #64748b; }
         
-        .message-ai { align-self: flex-start; background: linear-gradient(135deg, #fffbeb, #fef3c7); color: #92400e; border: 1px solid #fde68a; border-bottom-left-radius: 4px; border-top-left-radius: 16px; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1), 0 2px 4px -1px rgba(245, 158, 11, 0.06); }
+        .message-ai { align-self: flex-start; background: linear-gradient(135deg, #fffbeb, #fef3c7); color: #92400e; border: 1px solid #fde68a; border-bottom-left-radius: 4px; border-top-left-radius: 16px; box-shadow: 0 4px 6px -1px rgba(245, 158, 11, 0.1); }
         .message-ai .message-time { color: #b45309; }
 
-        .chat-input-area { padding: 16px 20px; background: #ffffff; border-top: 1px solid #e2e8f0; }
-        .shield-notice { background-color: #fffbeb; border: 1px solid #fef3c7; color: #d97706; padding: 8px 14px; font-size: 0.8rem; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; }
+        /* INPUT AREA */
+        .chat-input-area { padding: 16px 20px; background: #ffffff; border-top: 1px solid #e2e8f0; z-index: 10; }
+        .shield-notice { background-color: #fffbeb; border: 1px solid #fef3c7; color: #d97706; padding: 8px 14px; font-size: 0.85rem; border-radius: 12px; margin-bottom: 12px; display: flex; align-items: center; }
         
-        .action-btn { background: none; border: none; color: #64748b; padding: 0; font-size: 0.9rem; transition: color 0.2s; cursor: pointer; }
-        .action-btn:hover { color: var(--mango-orange); }
-        .mic-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .attach-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #f1f5f9; color: #475569; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .attach-btn:hover { background: #e2e8f0; color: var(--mango-orange); }
+        .mic-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #f1f5f9; color: #475569; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
         .mic-btn.recording { background: #ef4444; color: white; animation: pulse 1.5s infinite; }
-        .attach-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: #f1f5f9; color: #64748b; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
-        .attach-btn:hover { background: #e2e8f0; }
         
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
@@ -89,39 +104,44 @@ if ($vendor_id !== null) {
 
         .tick-sent { color: #94a3b8; } 
         .tick-read { color: #3b82f6; } 
-        
-        .delete-conv-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #cbd5e1; display: none; padding: 10px; border-radius: 50%; }
-        .conversation-item:hover .delete-conv-btn { display: flex; align-items: center; justify-content: center; }
-        .delete-conv-btn:hover { color: #ef4444; background: #fee2e2; }
 
+        /* RESPONSIVE MOBILE */
         @media (max-width: 768px) {
-            .inbox-sidebar { display: block; }
+            .chat-container { height: 100vh; margin-top: 0; border-radius: 0; border: none; }
+            .btn-dark.position-absolute { display: none; } /* On cache le bouton retour global sur mobile, géré par le header */
+            .inbox-sidebar { display: block; width: 100%; }
             .chat-main { display: none; }
             .chat-main.active { display: flex; position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; }
-            .conversation-item .delete-conv-btn { display: flex; }
         }
     </style>
 </head>
 <body>
 
-<a href="<?= $returnUrl ?>" class="btn btn-dark position-absolute shadow" style="top: 20px; left: 20px; z-index: 1000; border-radius: 50px;">
+<a href="<?= $returnUrl ?>" class="btn btn-dark position-absolute shadow d-none d-md-flex align-items-center" style="top: 20px; left: 20px; z-index: 1000; border-radius: 50px; font-weight: bold;">
     <i class="fa-solid fa-arrow-left me-2"></i> Tableau de bord
 </a>
 
-<div class="container-fluid h-100">
-    <div class="row h-100 justify-content-center align-items-center">
-        <div class="col-12 col-xl-10 h-100">
+<div class="container-fluid h-100 p-0 p-md-3">
+    <div class="row h-100 justify-content-center align-items-center m-0">
+        <div class="col-12 col-xl-10 h-100 p-0">
             <div class="row chat-container g-0">
                 
-                <!-- SIDEBAR -->
+                <!-- SIDEBAR (Liste des conversations) -->
                 <div class="col-12 col-md-4 inbox-sidebar" id="inboxSidebar">
-                    <div class="inbox-header text-center pt-5">
+                    <!-- En-tête Sidebar Mobile -->
+                    <div class="d-flex d-md-none align-items-center p-3 bg-white border-bottom">
+                        <a href="<?= $returnUrl ?>" class="btn btn-sm btn-light rounded-circle me-3"><i class="fa-solid fa-arrow-left"></i></a>
+                        <h6 class="m-0 fw-bold">Mes Messages</h6>
+                    </div>
+
+                    <div class="inbox-header text-center pt-4 d-none d-md-block">
                         <div class="d-inline-flex align-items-center justify-content-center w-12 h-12 rounded-circle bg-warning bg-opacity-10 text-warning mb-2 p-3">
                             <i class="fa-solid fa-shield-halved fa-2x"></i>
                         </div>
-                        <h5 class="m-0 fw-black">MAN GO Shield</h5>
+                        <h5 class="m-0 fw-black text-dark">MAN GO Shield</h5>
                         <small class="text-muted fw-bold">Messagerie 100% Sécurisée</small>
                     </div>
+                    
                     <div class="inbox-list" id="inboxList">
                         <div class="text-center p-5 text-muted">
                             <div class="spinner-border spinner-border-sm text-warning me-2" role="status"></div>
@@ -130,29 +150,32 @@ if ($vendor_id !== null) {
                     </div>
                 </div>
 
-                <!-- MAIN CHAT -->
+                <!-- MAIN CHAT (Zone de discussion) -->
                 <div class="col-12 col-md-8 chat-main" id="chatMain">
                     
                     <div class="chat-header" id="chatHeader" style="display: none;">
                         <div class="d-flex align-items-center gap-3">
                             <button class="btn btn-sm btn-light d-md-none rounded-circle" onclick="closeChatMobile()"><i class="fa-solid fa-arrow-left"></i></button>
-                            <div class="avatar-circle bg-warning text-dark" id="activeAvatar">U</div>
-                            <div>
-                                <h5 class="m-0 fw-bold text-dark" id="activeContactName">Utilisateur</h5>
-                                <small class="text-muted fw-bold" id="activeContactRole">Membre MAN GO</small>
-                            </div>
+                            
+                            <a href="#" id="viewProfileLink" class="d-flex align-items-center gap-3 text-decoration-none" title="Voir la boutique de cet utilisateur">
+                                <div id="activeAvatarContainer">
+                                    <div class="avatar-circle bg-warning text-dark" id="activeAvatar">U</div>
+                                </div>
+                                <div>
+                                    <h5 class="m-0 fw-bold text-dark" id="activeContactName">Utilisateur</h5>
+                                    <small class="text-muted fw-bold" id="activeContactRole">Membre MAN GO</small>
+                                </div>
+                            </a>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <button id="notifBtn" class="btn btn-light rounded-circle shadow-sm" onclick="toggleNotif()" title="Désactiver le son des notifications">
+                            <button id="notifBtn" class="btn btn-light rounded-circle shadow-sm" onclick="toggleNotif()" title="Son des notifications">
                                 <i class="fa-solid fa-bell text-warning"></i>
                             </button>
                             
                             <div class="dropdown">
                                 <button class="btn btn-light rounded-circle" data-bs-toggle="dropdown" title="Options de la discussion"><i class="fa-solid fa-ellipsis-vertical"></i></button>
                                 <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
-                                    <li><a class="dropdown-item text-danger" href="#" onclick="alert('Conversation signalée à l\'équipe de modération MAN GO.'); return false;"><i class="fa-solid fa-flag me-2"></i>Signaler l'utilisateur</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteEntireConversation(); return false;"><i class="fa-solid fa-trash-can me-2"></i>Supprimer la discussion</a></li>
+                                    <li><a class="dropdown-item text-danger fw-bold" href="#" onclick="alert('Conversation signalée à l\'équipe de modération MAN GO.'); return false;"><i class="fa-solid fa-flag me-2"></i> Signaler l'utilisateur</a></li>
                                 </ul>
                             </div>
                         </div>
@@ -164,7 +187,7 @@ if ($vendor_id !== null) {
                                 <i class="fa-solid fa-comments fa-3x text-warning"></i>
                             </div>
                             <h5 class="fw-bold text-dark">Vos messages s'affichent ici</h5>
-                            <p class="small">Sélectionnez une conversation dans le menu de gauche.</p>
+                            <p class="small fw-bold">Sélectionnez une conversation dans le menu de gauche.</p>
                         </div>
                     </div>
 
@@ -176,12 +199,10 @@ if ($vendor_id !== null) {
 
                         <!-- Menu des pièces jointes -->
                         <div id="attachmentMenu" class="bg-light p-2 rounded-3 mb-2 d-none flex-wrap gap-2">
-                            <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('fileImage').click()"><i class="fa-solid fa-image text-primary me-1"></i> Image (Max 5Mo)</button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('fileVideo').click()"><i class="fa-solid fa-video text-danger me-1"></i> Vidéo (Max 30s)</button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('fileDoc').click()"><i class="fa-solid fa-file-pdf text-danger me-1"></i> Document</button>
-                            <button type="button" class="btn btn-sm btn-outline-info" onclick="sendLocation()"><i class="fa-solid fa-location-dot text-info me-1"></i> Ma Position</button> 
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" onclick="document.getElementById('fileImage').click()"><i class="fa-solid fa-image text-primary me-1"></i> Image (Max 5Mo)</button>
+                            <button class="btn btn-sm btn-outline-secondary fw-bold" onclick="document.getElementById('fileDoc').click()"><i class="fa-solid fa-file-pdf text-danger me-1"></i> Document</button>
+                            <button type="button" class="btn btn-sm btn-outline-info fw-bold" onclick="sendLocation()"><i class="fa-solid fa-location-dot text-info me-1"></i> Ma Position</button> 
                             <input type="file" id="fileImage" accept="image/jpeg, image/png, image/webp" class="d-none" onchange="handleFileSelect(event)">
-                            <input type="file" id="fileVideo" accept="video/mp4" class="d-none" onchange="handleFileSelect(event)">
                             <input type="file" id="fileDoc" accept="application/pdf" class="d-none" onchange="handleFileSelect(event)">
                         </div>
 
@@ -193,21 +214,20 @@ if ($vendor_id !== null) {
                                     <div class="small fw-bold" style="color: var(--mango-orange);"><i class="fa-solid fa-reply me-1"></i> Réponse à :</div>
                                     <button type="button" class="btn-close btn-close-sm" onclick="cancelReply()" aria-label="Close"></button>
                                 </div>
-                                <div id="replyPreviewText" class="small text-truncate text-muted mt-1"></div>
+                                <div id="replyPreviewText" class="small text-truncate text-muted mt-1 fw-bold"></div>
                                 <input type="hidden" id="quotedMessageInput" value="">
                             </div>
 
                             <div class="d-flex align-items-center gap-2">
-                                <button type="button" class="attach-btn" onclick="toggleAttachmentMenu()">
-                                    <i class="fa-solid fa-plus fa-lg"></i>
+                                <button type="button" class="attach-btn shadow-sm" onclick="toggleAttachmentMenu()">
+                                    <i class="fa-solid fa-paperclip fa-lg"></i>
                                 </button>
 
-                                <div class="dropup">
-                                    <button type="button" class="attach-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Émojis">
+                                <div class="dropup d-none d-sm-block">
+                                    <button type="button" class="attach-btn shadow-sm" data-bs-toggle="dropdown" aria-expanded="false" title="Émojis">
                                         <i class="fa-regular fa-face-smile fa-lg"></i>
                                     </button>
                                     <div class="dropdown-menu p-2 shadow-lg border-0 mb-2" style="width: 240px; border-radius: 16px;">
-                                        <h6 class="dropdown-header text-center fw-bold text-muted" style="font-size: 0.75rem;">Icônes Commerciales</h6>
                                         <div class="d-flex flex-wrap gap-1 justify-content-center">
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('🤝')">🤝</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('📦')">📦</button>
@@ -215,10 +235,6 @@ if ($vendor_id !== null) {
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('💳')">💳</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('✅')">✅</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('⚠️')">⚠️</button>
-                                            <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('💰')">💰</button>
-                                            <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('🛒')">🛒</button>
-                                            <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('🏷️')">🏷</button>
-                                            <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('📍')">📍</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('🙏')">🙏</button>
                                             <button type="button" class="btn btn-light btn-sm fs-5 p-1 border-0" onclick="insertEmoji('👍')">👍</button>
                                         </div>
@@ -226,8 +242,8 @@ if ($vendor_id !== null) {
                                 </div>
 
                                 <div class="input-group shadow-sm rounded-pill p-1 bg-white border border-secondary border-opacity-25 flex-grow-1">
-                                    <input type="text" id="messageInput" class="form-control border-0 bg-transparent shadow-none px-4 transition-all" placeholder="Écrivez ou dictez un message..." autocomplete="off" spellcheck="true" lang="fr">
-                                    <button class="btn text-white rounded-pill px-4 fw-bold transition" style="background-color: var(--mango-orange);" type="submit" id="sendBtn">
+                                    <input type="text" id="messageInput" class="form-control border-0 bg-transparent shadow-none px-3 px-md-4 transition-all fw-bold text-dark" placeholder="Écrivez un message..." autocomplete="off" spellcheck="true" lang="fr">
+                                    <button class="btn text-white rounded-pill px-3 px-md-4 fw-bold transition" style="background-color: var(--mango-orange);" type="submit" id="sendBtn">
                                         <i class="fa-solid fa-paper-plane"></i>
                                     </button>
                                 </div>
@@ -250,6 +266,8 @@ if ($vendor_id !== null) {
     const CURRENT_USER_ID = <?= json_encode($current_user_id); ?>;
     const URL_VENDOR_ID = <?= json_encode($vendor_id); ?>;
     const URL_VENDOR_NAME = <?= json_encode($target_name); ?>;
+    const baseUrl = <?= json_encode($baseUrl); ?>;
+    
     let activeReceiverId = null;
     let pollInterval = null;
     let lastMessagesHtml = ''; 
@@ -259,12 +277,12 @@ if ($vendor_id !== null) {
     let lastMessageId = 0;
     
     let deletedConversations = JSON.parse(localStorage.getItem('mango_deleted_convs')) || [];
+    let pinnedConversations = JSON.parse(localStorage.getItem('mango_pinned_convs')) || [];
     
-    const SpeechRecognition = window.SpeechRecognition ? window.SpeechRecognition : (window.webkitSpeechRecognition ? window.webkitSpeechRecognition : null);
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     let recognition = null;
     let isRecording = false;
 
-    // === GESTION DE LA DICTÉE VOCALE (Avec UI Feedback direct) ===
     if (SpeechRecognition) {
         recognition = new SpeechRecognition();
         recognition.continuous = false;
@@ -273,14 +291,8 @@ if ($vendor_id !== null) {
         
         recognition.onstart = function() {
             isRecording = true;
-            const micBtn = document.getElementById('micBtn');
-            const inputField = document.getElementById('messageInput');
-            
-            // Effets visuels style WhatsApp (Couleur, Icône, Placeholder)
-            micBtn.classList.add('recording');
-            micBtn.innerHTML = '<i class="fa-solid fa-microphone-lines fa-fade fa-lg"></i>';
-            inputField.placeholder = "🎙️ Écoute en cours... Parlez !";
-            inputField.classList.add('bg-danger', 'bg-opacity-10'); // Léger fond rouge
+            document.getElementById('micBtn').classList.add('recording');
+            document.getElementById('messageInput').placeholder = "🎙️ Parlez maintenant...";
         };
         
         recognition.onresult = function(event) {
@@ -292,19 +304,8 @@ if ($vendor_id !== null) {
 
         recognition.onend = function() {
             isRecording = false;
-            const micBtn = document.getElementById('micBtn');
-            const inputField = document.getElementById('messageInput');
-            
-            // On remet tout à l'état normal
-            micBtn.classList.remove('recording');
-            micBtn.innerHTML = '<i class="fa-solid fa-microphone fa-lg"></i>';
-            inputField.placeholder = "Écrivez ou dictez un message...";
-            inputField.classList.remove('bg-danger', 'bg-opacity-10');
-        };
-
-        recognition.onerror = function(event) {
-            console.error("Erreur de dictée : ", event.error);
-            recognition.onend(); // Réinitialise l'interface en cas d'erreur
+            document.getElementById('micBtn').classList.remove('recording');
+            document.getElementById('messageInput').placeholder = "Écrivez un message...";
         };
     }
 
@@ -314,19 +315,14 @@ if ($vendor_id !== null) {
         setInterval(checkOnlineStatus, 10000); 
 
         if (URL_VENDOR_ID && URL_VENDOR_ID != CURRENT_USER_ID) {
-            setTimeout(() => {
-                openChat(URL_VENDOR_ID, URL_VENDOR_NAME);
-                document.getElementById('chatHeader').style.display = 'flex';
-                document.getElementById('chatInputArea').style.display = 'block';
-                document.getElementById('chatMain').classList.add('active');
-            }, 200);
+            setTimeout(() => { openChat(URL_VENDOR_ID, URL_VENDOR_NAME); }, 200);
         }
     });
 
     async function loadInbox() {
         const inboxList = document.getElementById('inboxList');
         try {
-            const response = await fetch('api/chat.php?action=inbox');
+            const response = await fetch(`${baseUrl}/api/chat.php?action=inbox`);
             const textResponse = await response.text();
             let conversations;
             
@@ -338,56 +334,108 @@ if ($vendor_id !== null) {
             }
 
             if (!conversations || conversations.length === 0) {
-                inboxList.innerHTML = `<div class="text-center p-5 text-muted"><i class="fa-solid fa-inbox fa-2x mb-3 text-light"></i><br>Aucune conversation.</div>`;
+                inboxList.innerHTML = `<div class="text-center p-5 text-muted"><i class="fa-solid fa-inbox fa-2x mb-3 text-light"></i><br><span class="fw-bold">Aucune conversation.</span></div>`;
                 return;
             }
+
+            // Tri pour mettre les épinglés en haut
+            conversations.sort((a, b) => {
+                const aPinned = pinnedConversations.includes(a.contact_id);
+                const bPinned = pinnedConversations.includes(b.contact_id);
+                if (aPinned && !bPinned) return -1;
+                if (!aPinned && bPinned) return 1;
+                return new Date(b.created_at) - new Date(a.created_at);
+            });
 
             let html = '';
             conversations.forEach(conv => {
                 const isActive = (conv.contact_id == activeReceiverId) ? 'active' : '';
-                let fName = conv.firstname ? conv.firstname : '';
-                let lName = conv.lastname ? conv.lastname : '';
-                let cName = (fName + ' ' + lName).trim();
+                let cName = ((conv.firstname || '') + ' ' + (conv.lastname || '')).trim();
                 const contactName = cName !== '' ? cName : 'Utilisateur #' + conv.contact_id;
                 const initial = contactName.charAt(0).toUpperCase();
                 
+                // Gestion de l'avatar
+                let avatarHtml = '';
+                if (conv.avatar && conv.avatar !== '') {
+                    avatarHtml = `<img src="${baseUrl}/${conv.avatar}" class="rounded-circle object-fit-cover shadow-sm" style="width: 48px; height: 48px; border: 2px solid #fff;">`;
+                } else {
+                    avatarHtml = `<div class="avatar-circle shadow-sm">${initial}</div>`;
+                }
+
                 let unreadBadge = '';
                 if (conv.is_read == 0 && conv.receiver_id == CURRENT_USER_ID) {
                     unreadBadge = '<span class="badge bg-danger rounded-pill shadow-sm">Nouveau</span>';
                 }
 
-                let cleanPreview = conv.message ? conv.message.replace(/\[QUOTE\](.*?)\[\/QUOTE\]\n?/g, '↪️ Réponse : ') : '';
+                const isPinned = pinnedConversations.includes(conv.contact_id);
+                const pinIcon = isPinned ? '<i class="fa-solid fa-thumbtack text-warning ms-1" style="font-size: 0.7rem; transform: rotate(45deg);"></i>' : '';
+
+                let cleanPreview = conv.message ? conv.message.replace(/[QUOTE](.*?)\[\/QUOTE\]\n?/g, '↪️ ') : '';
 
                 html += `
                     <div class="conversation-item ${isActive}" onclick="openChat(${conv.contact_id}, '${escapeHtml(contactName)}')">
                         <div class="d-flex align-items-center gap-3">
-                            <div class="avatar-circle shadow-sm">${initial}</div>
+                            ${avatarHtml}
                             <div class="flex-grow-1 overflow-hidden pe-4">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <h6 class="m-0 fw-bold text-dark text-truncate">${escapeHtml(contactName)}</h6>
-                                    <small class="text-muted" style="font-size:0.7rem;">${formatTime(conv.created_at)}</small>
+                                    <h6 class="m-0 fw-bold text-dark text-truncate">${escapeHtml(contactName)} ${pinIcon}</h6>
+                                    <small class="text-muted fw-bold" style="font-size:0.7rem;">${formatTime(conv.created_at)}</small>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <p class="m-0 text-muted text-truncate" style="font-size: 0.85rem; ${unreadBadge !== '' ? 'font-weight:bold; color:#0f172a;' : ''}">${escapeHtml(cleanPreview)}</p>
+                                    <p class="m-0 text-muted text-truncate fw-bold" style="font-size: 0.85rem; ${unreadBadge !== '' ? 'color:#0f172a;' : ''}">${escapeHtml(cleanPreview)}</p>
                                     ${unreadBadge}
                                 </div>
                             </div>
                         </div>
-                        <button class="delete-conv-btn shadow-sm" onclick="hideConversation(event, ${conv.contact_id})" title="Effacer la discussion de mon écran">
-                            <i class="fa-solid fa-trash-can"></i>
-                        </button>
+                        
+                        <!-- Le menu déroulant (3 points) -->
+                        <div class="dropdown" onclick="event.stopPropagation();">
+                            <button class="conv-options-btn" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fa-solid fa-ellipsis-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end conv-dropdown-menu">
+                                <li>
+                                    <a class="dropdown-item conv-dropdown-item" href="#" onclick="togglePinConversation(event, ${conv.contact_id})">
+                                        <i class="fa-solid fa-thumbtack text-secondary w-4"></i> 
+                                        ${isPinned ? 'Désépingler' : 'Épingler en haut'}
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item conv-dropdown-item" href="${baseUrl}/store.php?id=${conv.contact_id}">
+                                        <i class="fa-solid fa-store text-secondary w-4"></i> Voir la boutique
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider m-0"></li>
+                                <li>
+                                    <a class="dropdown-item conv-dropdown-item danger" href="#" onclick="hideConversation(event, ${conv.contact_id})">
+                                        <i class="fa-solid fa-trash-can w-4"></i> Supprimer la discussion
+                                    </a>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 `;
             });
             inboxList.innerHTML = html;
         } catch (error) { 
-            inboxList.innerHTML = `<div class="text-center p-4 text-danger">Impossible de contacter le serveur.</div>`;
+            inboxList.innerHTML = `<div class="text-center p-4 text-danger fw-bold">Impossible de contacter le serveur.</div>`;
         }
     }
 
+    function togglePinConversation(event, contactId) {
+        event.preventDefault();
+        if (pinnedConversations.includes(contactId)) {
+            pinnedConversations = pinnedConversations.filter(id => id !== contactId);
+        } else {
+            pinnedConversations.push(contactId);
+        }
+        localStorage.setItem('mango_pinned_convs', JSON.stringify(pinnedConversations));
+        loadInbox();
+    }
+
     function hideConversation(event, contactId) {
-        event.stopPropagation();
-        if(confirm("Voulez-vous retirer cette discussion de votre écran ? L'historique sera conservé en sécurité en cas de litige.")) {
+        event.preventDefault();
+        if(confirm("Supprimer cette discussion de votre écran ? L'historique sera conservé en sécurité.")) {
             deletedConversations.push(contactId);
             localStorage.setItem('mango_deleted_convs', JSON.stringify(deletedConversations));
             
@@ -400,7 +448,6 @@ if ($vendor_id !== null) {
                             <i class="fa-solid fa-comments fa-3x text-warning"></i>
                         </div>
                         <h5 class="fw-bold text-dark">Vos messages s'affichent ici</h5>
-                        <p class="small">Sélectionnez une conversation dans le menu de gauche.</p>
                     </div>
                 `;
                 activeReceiverId = null;
@@ -412,7 +459,7 @@ if ($vendor_id !== null) {
 
     function deleteEntireConversation() {
         if(activeReceiverId) {
-            hideConversation({ stopPropagation: function(){} }, activeReceiverId);
+            hideConversation({ preventDefault: function(){} }, activeReceiverId);
         }
     }
 
@@ -427,6 +474,7 @@ if ($vendor_id !== null) {
         document.getElementById('chatInputArea').style.display = 'block';
         document.getElementById('chatMain').classList.add('active');
         document.getElementById('activeContactName').innerText = contactName;
+        document.getElementById('viewProfileLink').href = `${baseUrl}/store.php?id=${receiverId}`;
         document.getElementById('activeAvatar').innerText = contactName.charAt(0).toUpperCase();
         
         loadMessages();
@@ -438,7 +486,7 @@ if ($vendor_id !== null) {
     async function loadMessages() {
         if (!activeReceiverId) return;
         try {
-            const response = await fetch(`api/chat.php?action=get&receiver_id=${activeReceiverId}`);
+            const response = await fetch(`${baseUrl}/api/chat.php?action=get&receiver_id=${activeReceiverId}`);
             const textResponse = await response.text();
             let messages;
             
@@ -455,7 +503,7 @@ if ($vendor_id !== null) {
                                 <i class="fa-solid fa-handshake fa-3x text-warning"></i>
                             </div>
                             <h5 class="fw-bold text-dark">Nouvelle discussion</h5>
-                            <p class="small">Envoyez un premier message pour démarrer l'échange.</p>
+                            <p class="small fw-bold">Envoyez un premier message pour démarrer l'échange.</p>
                         </div>`;
                 }
                 return;
@@ -487,18 +535,15 @@ if ($vendor_id !== null) {
                 
                 if (!isDeleted) {
                     let menuItems = '';
-                    
-                    menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="toggleImportant(${msg.id}); return false;"><i class="fa-solid fa-star me-2 ${isStarred ? 'text-warning' : 'text-secondary'}"></i> ${isStarred ? 'Retirer des favoris' : 'Marquer comme important'}</a></li>`;
-                    menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="navigator.clipboard.writeText('${safeText}'); alert('Message copié !'); return false;"><i class="fa-regular fa-copy me-2 text-secondary"></i> Copier</a></li>`;
-                    menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="replyToMessage('${safeText}'); return false;"><i class="fa-solid fa-reply me-2 text-secondary"></i> Répondre</a></li>`;
-                    
+                    menuItems += `<li><a class="dropdown-item py-2 text-dark fw-bold" href="#" onclick="toggleImportant(${msg.id}); return false;"><i class="fa-solid fa-star me-2 ${isStarred ? 'text-warning' : 'text-secondary'}"></i> ${isStarred ? 'Retirer des favoris' : 'Marquer comme important'}</a></li>`;
+                    menuItems += `<li><a class="dropdown-item py-2 text-dark fw-bold" href="#" onclick="navigator.clipboard.writeText('${safeText}'); alert('Message copié !'); return false;"><i class="fa-regular fa-copy me-2 text-secondary"></i> Copier</a></li>`;
+                    menuItems += `<li><a class="dropdown-item py-2 text-dark fw-bold" href="#" onclick="replyToMessage('${safeText}'); return false;"><i class="fa-solid fa-reply me-2 text-secondary"></i> Répondre</a></li>`;
                     if (!isSent && !isAi) {
-                        menuItems += `<li><a class="dropdown-item py-2 text-dark" href="#" onclick="translateMessage(${msg.id}, '${safeText}'); return false;"><i class="fa-solid fa-language me-2 text-info"></i> Traduire</a></li>`;
+                        menuItems += `<li><a class="dropdown-item py-2 text-dark fw-bold" href="#" onclick="translateMessage(${msg.id}, '${safeText}'); return false;"><i class="fa-solid fa-language me-2 text-info"></i> Traduire</a></li>`;
                     }
-                    
                     if (isSent) {
                         menuItems += `<li><hr class="dropdown-divider"></li>`;
-                        menuItems += `<li><a class="dropdown-item text-danger py-2" href="#" onclick="deleteMessage(${msg.id}); return false;"><i class="fa-regular fa-trash-can me-2"></i> Supprimer (pour tous)</a></li>`;
+                        menuItems += `<li><a class="dropdown-item text-danger py-2 fw-bold" href="#" onclick="deleteMessage(${msg.id}); return false;"><i class="fa-regular fa-trash-can me-2"></i> Supprimer (pour tous)</a></li>`;
                     }
 
                     let chevronColor = isSent ? 'text-white-50' : (isAi ? 'text-warning' : 'text-secondary');
@@ -515,7 +560,6 @@ if ($vendor_id !== null) {
                 }
 
                 let displayMessage = escapeHtml(msg.message);
-                
                 let aiHeader = '';
                 if (isAi && !isDeleted) {
                     displayMessage = displayMessage.replace(/^🤖 IA : /, '').replace(/^🤖 Réponse automatique : /, '');
@@ -524,15 +568,14 @@ if ($vendor_id !== null) {
                             <div class="bg-amber-100 text-amber-600 rounded-circle d-flex align-items-center justify-center me-2" style="width:24px; height:24px; font-size:0.7rem;">
                                 <i class="fa-solid fa-robot"></i>
                             </div>
-                            <span class="font-bold text-xs" style="color: #b45309; text-transform: uppercase; letter-spacing: 0.5px;">Assistant IA</span>
+                            <span class="font-bold text-xs" style="color: #b45309; text-transform: uppercase;">Assistant IA</span>
                         </div>
                     `;
                 }
 
                 let customBubbleStyle = !isDeleted ? 'padding-right: 25px;' : '';
-                
                 let replyBlock = '';
-                const quoteRegex = /\[QUOTE\](.*?)\[\/QUOTE\]/;
+                const quoteRegex = /[QUOTE](.*?)\[\/QUOTE\]/;
                 const quoteMatch = displayMessage.match(quoteRegex);
                 if (quoteMatch) {
                     const quotedText = quoteMatch[1];
@@ -540,7 +583,7 @@ if ($vendor_id !== null) {
                     replyBlock = `
                         <div class="mb-2 p-2 rounded" style="background-color: rgba(0,0,0,0.05); border-left: 4px solid var(--mango-orange); font-size: 0.85rem; color: #64748b;">
                             <div class="fw-bold mb-1" style="color: var(--mango-orange);"><i class="fa-solid fa-reply me-1"></i> Réponse :</div>
-                            <div class="text-truncate" style="max-height: 40px; overflow: hidden;">${quotedText}</div>
+                            <div class="text-truncate fw-bold" style="max-height: 40px; overflow: hidden;">${quotedText}</div>
                         </div>
                     `;
                 }
@@ -562,7 +605,7 @@ if ($vendor_id !== null) {
             });
             
             if (messages.length > 0) {
-                let latestMsg = messages[messages.length - 1];
+                let latestMsg = messages[messages.length - 1]; 
                 if (latestMsg.id > lastMessageId) {
                     if (lastMessageId !== 0 && latestMsg.sender_id != CURRENT_USER_ID && soundEnabled) {
                         notifSound.play().catch(e => console.log("Son bloqué"));
@@ -584,14 +627,9 @@ if ($vendor_id !== null) {
     window.replyToMessage = function(text) {
         let cleanText = text.replace(/(\r\n|\n|\r)/gm, " ");
         let shortText = cleanText.length > 60 ? cleanText.substring(0, 60) + "..." : cleanText;
-        
-        const previewContainer = document.getElementById('replyPreviewContainer');
-        const previewText = document.getElementById('replyPreviewText');
-        const hiddenInput = document.getElementById('quotedMessageInput');
-        
-        previewText.innerText = shortText;
-        hiddenInput.value = shortText;
-        previewContainer.classList.remove('d-none');
+        document.getElementById('replyPreviewText').innerText = shortText;
+        document.getElementById('quotedMessageInput').value = shortText;
+        document.getElementById('replyPreviewContainer').classList.remove('d-none');
         document.getElementById('messageInput').focus();
     };
 
@@ -604,63 +642,49 @@ if ($vendor_id !== null) {
         soundEnabled = !soundEnabled;
         const btn = document.getElementById('notifBtn');
         btn.innerHTML = soundEnabled ? '<i class="fa-solid fa-bell text-warning"></i>' : '<i class="fa-solid fa-bell-slash text-muted"></i>';
-        btn.title = soundEnabled ? 'Désactiver le son des notifications' : 'Activer le son des notifications';
     }
 
     function toggleImportant(msgId) {
         let starred = JSON.parse(localStorage.getItem('mango_starred')) || [];
-        if (starred.includes(msgId)) {
-            starred = starred.filter(id => id !== msgId);
-        } else {
-            starred.push(msgId); 
-        }
+        if (starred.includes(msgId)) { starred = starred.filter(id => id !== msgId); } 
+        else { starred.push(msgId); }
         localStorage.setItem('mango_starred', JSON.stringify(starred));
-        lastMessagesHtml = ''; 
-        loadMessages(); 
+        lastMessagesHtml = ''; loadMessages(); 
     }
 
     function toggleDictation() {
         if (!recognition) { alert("Navigateur incompatible."); return; }
-        if (isRecording) { recognition.stop(); } 
-        else {
-            recognition.start();
-        }
+        if (isRecording) { recognition.stop(); } else { recognition.start(); }
     }
 
     function toggleAttachmentMenu() {
         const menu = document.getElementById('attachmentMenu');
-        menu.classList.toggle('d-none');
-        menu.classList.toggle('d-flex');
+        menu.classList.toggle('d-none'); menu.classList.toggle('d-flex');
     }
 
     function insertEmoji(emoji) {
         const input = document.getElementById('messageInput');
-        input.value = input.value + emoji;
-        input.focus();
+        input.value = input.value + emoji; input.focus();
     }
 
     function handleFileSelect(event) {
         const file = event.target.files[0];
         if (!file) return;
-        let fileType = 'Fichier';
-        if (file.type.includes('image')) fileType = 'Image';
-        if (file.type.includes('video')) fileType = 'Vidéo';
-        document.getElementById('messageInput').value = `[📁 ${fileType} jointe : ${file.name}]`;
+        document.getElementById('messageInput').value = `[📁 Fichier joint : ${file.name}]`;
         toggleAttachmentMenu();
-        alert("Envoi simulé : Le système Backend n'est pas encore configuré pour recevoir des fichiers.");
     }
 
     async function translateMessage(msgId, text) {
         const container = document.getElementById(`trans-${msgId}`);
-        container.innerHTML = '<small class="text-warning"><i class="fa-solid fa-spinner fa-spin"></i> Traduction...</small>';
+        container.innerHTML = '<small class="text-warning fw-bold"><i class="fa-solid fa-spinner fa-spin"></i> Traduction...</small>';
         try {
             const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=fr&dt=t&q=${encodeURI(text)}`;
             const res = await fetch(url);
             const data = await res.json();
             const translatedText = data[0].map(item => item[0]).join('');
-            container.innerHTML = `<hr class="my-1 border-secondary opacity-25"><small class="text-info fw-bold"><i class="fa-solid fa-language me-1"></i> Traduit : ${escapeHtml(translatedText)}</small>`;
+            container.innerHTML = `<hr class="my-1 border-secondary opacity-25"><small class="text-info fw-bold"><i class="fa-solid fa-language me-1"></i> ${escapeHtml(translatedText)}</small>`;
         } catch (e) {
-            container.innerHTML = '<small class="text-danger">Erreur.</small>';
+            container.innerHTML = '<small class="text-danger fw-bold">Erreur de traduction.</small>';
         }
     }
 
@@ -671,8 +695,7 @@ if ($vendor_id !== null) {
         const sendBtn = document.getElementById('sendBtn');
         let message = input.value.trim();
         
-        if (!message) return;
-        if (!activeReceiverId) return;
+        if (!message || !activeReceiverId) return;
 
         if (hiddenQuoteInput && hiddenQuoteInput.value) {
             message = `[QUOTE]${hiddenQuoteInput.value}[/QUOTE]\n${message}`;
@@ -690,28 +713,14 @@ if ($vendor_id !== null) {
         input.value = '';
 
         try {
-            const response = await fetch('api/chat.php', { method: 'POST', body: formData });
-            const textResult = await response.text();
-            try {
-                const result = JSON.parse(textResult);
-                if (result.status === 'success') {
-                    await loadMessages();
-                    const messagesContainer = document.getElementById('chatMessages');
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight; 
-                    
-                    if (deletedConversations.includes(activeReceiverId)) {
-                        deletedConversations = deletedConversations.filter(id => id !== activeReceiverId);
-                        localStorage.setItem('mango_deleted_convs', JSON.stringify(deletedConversations));
-                    }
-                    loadInbox();
-                } else {
-                    alert(result.message ? result.message : "Erreur lors de l'envoi.");
-                }
-            } catch (parseError) {
-                alert("Erreur serveur : " + textResult);
+            const response = await fetch(`${baseUrl}/api/chat.php`, { method: 'POST', body: formData });
+            const result = await response.json();
+            if (result.status === 'success') {
+                await loadMessages();
+                document.getElementById('chatMessages').scrollTop = document.getElementById('chatMessages').scrollHeight; 
+                loadInbox();
             }
         } catch (error) { 
-            alert("Erreur de connexion.");
         } finally {
             sendBtn.disabled = false;
             sendBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i>';
@@ -720,24 +729,18 @@ if ($vendor_id !== null) {
     }
 
     async function deleteMessage(msgId) {
-        if (!confirm("Voulez-vous vraiment supprimer ce message pour tout le monde ?")) return;
+        if (!confirm("Supprimer ce message pour tout le monde ?")) return;
         try {
             const formData = new FormData();
             formData.append('action', 'delete');
             formData.append('id', msgId);
-            const response = await fetch('api/chat.php', { method: 'POST', body: formData });
-            const result = await response.json();
-            if (result.status === 'success') {
-                loadMessages(); 
-            } else {
-                alert(result.message);
-            }
+            await fetch(`${baseUrl}/api/chat.php`, { method: 'POST', body: formData });
+            loadMessages(); 
         } catch (error) {}
     }
 
     function closeChatMobile() {
         document.getElementById('chatMain').classList.remove('active');
-        if (pollInterval) clearInterval(pollInterval);
     }
 
     function escapeHtml(text) {
@@ -747,45 +750,28 @@ if ($vendor_id !== null) {
 
     function formatTime(dateTimeStr) {
         if (!dateTimeStr) return '';
-        const date = new Date(dateTimeStr);
-        return date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+        return new Date(dateTimeStr).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
     }
 
     function sendLocation() {
-        if (!navigator.geolocation) {
-            alert("La géolocalisation n'est pas supportée.");
-            return;
-        }
-
+        if (!navigator.geolocation) return;
         const input = document.getElementById('messageInput');
-        const originalText = input.value; 
-        input.value = "📍 Calcul de la position...";
+        input.value = "📍 Calcul...";
         toggleAttachmentMenu(); 
-
         navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                const mapLink = `📍 Ma position : https://www.google.com/maps?q=${lat},${lng}`;
-                input.value = originalText + (originalText ? " " : "") + mapLink;
-                input.focus();
-            },
-            (error) => {
-                input.value = originalText; 
-                alert("Impossible d'obtenir votre position. Avez-vous autorisé l'accès GPS ?");
-            },
-            { enableHighAccuracy: true, timeout: 10000 }
+            (pos) => { input.value = `📍 Ma position : https://www.google.com/maps?q=${pos.coords.latitude},${pos.coords.longitude}`; input.focus(); },
+            (err) => { input.value = ""; alert("Erreur GPS."); }
         );
     }
 
     async function checkOnlineStatus() {
         if (!activeReceiverId) return;
         try {
-            const res = await fetch(`api/chat.php?action=status&id=${activeReceiverId}`);
+            const res = await fetch(`${baseUrl}/api/chat.php?action=status&id=${activeReceiverId}`);
             const data = await res.json();
             const roleEl = document.getElementById('activeContactRole');
             if (data.online) {
-                roleEl.innerHTML = '<span class="text-success fw-bold"><i class="fa-solid fa-circle" style="font-size:0.5rem; margin-right:4px; vertical-align:middle;"></i> En ligne</span>';
+                roleEl.innerHTML = '<span class="text-success fw-bold"><i class="fa-solid fa-circle" style="font-size:0.5rem; margin-right:4px;"></i> En ligne</span>';
             } else {
                 roleEl.innerHTML = 'Membre MAN GO';
             }

@@ -73,11 +73,41 @@ try {
         }
     }
 
+    // =========================================================================
+    // RADAR DE STATISTIQUES (Géolocalisation & Anti-Triche)
+    // =========================================================================
     if (!$isOwner) {
-        try {
-            $stmtView = $db->prepare("INSERT INTO ad_views (listing_id, stand_id, country, city, created_at) VALUES (?, ?, 'Togo', 'Lomé', NOW())");
-            $stmtView->execute([$listing['id'], $listing['stand_id'] ?? 0]);
-        } catch(Exception $e) {} 
+        // On récupère l'adresse IP du visiteur
+        $visitorIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+        
+        // Pour éviter de compter 50 vues si le client rafraîchit la page, on vérifie s'il l'a déjà vue aujourd'hui
+        $stmtCheckView = $db->prepare("SELECT id FROM ad_views WHERE listing_id = ? AND ip_address = ? AND DATE(created_at) = CURDATE()");
+        $stmtCheckView->execute([$listing['id'], $visitorIp]);
+        
+        if (!$stmtCheckView->fetch()) {
+            // Le client n'a pas encore vu cette annonce aujourd'hui !
+            
+            // On cherche son Pays et sa Ville grâce à une API gratuite (ip-api.com)
+            $country = 'Inconnu';
+            $city = 'Inconnu';
+            
+            // Note : En local (localhost), l'IP est ::1, donc l'API ne trouvera rien. Ça marchera en ligne !
+            if ($visitorIp !== '127.0.0.1' && $visitorIp !== '::1') {
+                // Utilisation d'un timeout court (2s) pour ne pas ralentir le chargement de la page si l'API est lente
+                $ctx = stream_context_create(['http' => ['timeout' => 2]]);
+                $ipData = @json_decode(file_get_contents("http://ip-api.com/json/{$visitorIp}?fields=country,city,status", false, $ctx), true);
+                if ($ipData && $ipData['status'] === 'success') {
+                    $country = $ipData['country'];
+                    $city = $ipData['city'];
+                }
+            }
+
+            // On enregistre la vraie vue dans la base de données
+            try {
+                $stmtRecordView = $db->prepare("INSERT INTO ad_views (stand_id, listing_id, ip_address, country, city, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+                $stmtRecordView->execute([$listing['stand_id'] ?? 0, $listing['id'], $visitorIp, $country, $city]);
+            } catch(Exception $e) {} 
+        }
     }
 
     $similar_listings = [];
@@ -295,7 +325,9 @@ require_once __DIR__ . '/themes/default/templates/layouts/header.php';
                         <?= strtoupper(substr($listing['seller_name'] ?? 'V', 0, 1)) ?>
                     </div>
                     <div>
-                        <h4 class="font-bold text-slate-900 text-lg"><?= htmlspecialchars($listing['seller_name']) ?></h4>
+                        <a href="<?= $baseUrl ?>/store.php?id=<?= $listing['user_id'] ?>" class="font-bold text-slate-900 text-lg hover:text-amber-600 transition">
+                            <?= htmlspecialchars($listing['seller_name']) ?>
+                        </a>
                         <p class="text-xs font-bold text-slate-400">Membre depuis <?= !empty($listing['seller_joined']) ? date('Y', strtotime($listing['seller_joined'])) : 'N/A' ?></p>
                         <?php if(!empty($listing['seller_is_premium'])): ?>
                             <span class="inline-flex mt-1 bg-amber-100 text-amber-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase"><i class="fa-solid fa-crown mr-1"></i> PRO</span>

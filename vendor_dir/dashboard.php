@@ -33,35 +33,16 @@ $db = (method_exists($dbInstance, 'getConnection')) ? $dbInstance->getConnection
 // =====================================================================
 // VÉRIFICATION DE L'ABONNEMENT
 // =====================================================================
-$stmtSub = $db->prepare("
-    SELECT s.end_date, p.name as plan_name, p.id as plan_id
-    FROM user_subscriptions s
-    JOIN subscription_plans p ON s.plan_id = p.id
-    WHERE s.user_id = ? AND s.status = 'active' AND s.end_date > NOW()
-    ORDER BY s.id DESC LIMIT 1
-");
-$stmtSub->execute([$_SESSION['user_id']]);
-$activeSub = $stmtSub->fetch(PDO::FETCH_ASSOC);
+$stmtUser = $db->prepare("SELECT is_premium FROM users WHERE id = ?");
+$stmtUser->execute([$userId]);
+$userStatus = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-$isPremium = false;
-$currentPlanName = '';
-$daysRemaining = 0;
+$isPremium = ($userStatus && $userStatus['is_premium'] == 1);
+$currentPlanName = $isPremium ? 'Plan Pro Actif' : '';
+$daysRemaining = $isPremium ? 'Illimité' : 0;
 
 $planBadgeColor = 'bg-amber-100 text-amber-700 border-amber-200'; 
 $planIconColor = 'text-amber-500';
-
-if ($activeSub) {
-    $isPremium = true;
-    $currentPlanName = $activeSub['plan_name'];
-    $endDate = new DateTime($activeSub['end_date']);
-    $now = new DateTime();
-    $daysRemaining = $now->diff($endDate)->days;
-    
-    if ($activeSub['plan_id'] == 3) { 
-        $planBadgeColor = 'bg-blue-100 text-blue-700 border-blue-200';
-        $planIconColor = 'text-blue-500';
-    }
-}
 
 // =====================================================================
 // SUPPRESSION D'UNE ANNONCE
@@ -440,8 +421,8 @@ $activeTab = $_GET['tab'] ?? 'tab-stats';
                 <h2 class="text-lg font-black text-slate-900 mb-4">Analyses Géographiques & Audience</h2>
                 
                 <?php if ($isPremium): ?>
-                    <div class="p-6 sm:p-8 bg-slate-900 rounded-3xl border <?= ($activeSub['plan_id'] == 3) ? 'border-blue-500/30' : 'border-amber-500/30' ?> relative overflow-hidden mb-6 shadow-xl">
-                        <div class="absolute -right-6 -top-6 text-[8rem] opacity-5 <?= $planIconColor ?>">
+                    <div class="p-6 sm:p-8 bg-slate-900 rounded-3xl border border-amber-500/30 relative overflow-hidden mb-6 shadow-xl">
+                        <div class="absolute -right-6 -top-6 text-[8rem] opacity-5 text-amber-500">
                             <i class="fa-solid fa-crown"></i>
                         </div>
                         
